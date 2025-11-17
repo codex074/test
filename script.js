@@ -1908,7 +1908,7 @@ function renderHourlyRecords(records) {
         const statusClass = r.confirmed ? 'text-green-500' : 'text-yellow-500';
 
         tbody.innerHTML += `
-        <tr class="border-b hover:bg-gray-50">
+        <tr class="border-b hover:bg-gray-50" data-id="${r.id}" onclick="showHourlyDetailModal('${r.id}')">
             <td class="px-4 py-3">${formatDateThaiShort(r.date)}</td>
             <td class="px-4 py-3">${r.userNickname}</td>
             <td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(user.position)}">${user.position || 'N/A'}</span></td>
@@ -3509,4 +3509,67 @@ window.editHourlyRecord = async function(id) {
     await updateDoc(doc(db, "hourlyRecords", id), form);
     showSuccessPopup('อัปเดตสำเร็จ');
     renderAdminDashboard();
+};
+
+
+// --- Backup JSON modal control and download functions ---
+window.openBackupMenu = function() {
+    const m = document.getElementById('backup-modal');
+    if (m) m.classList.remove('hidden');
+};
+window.closeBackupMenu = function() {
+    const m = document.getElementById('backup-modal');
+    if (m) m.classList.add('hidden');
+};
+
+window.downloadHourlyJSON = function() {
+    try {
+        const data = Array.isArray(allHourlyRecords) ? allHourlyRecords.map(r => ({
+            userNickname: r.userNickname,
+            type: r.type,
+            date: r.date,
+            startTime: r.startTime,
+            endTime: r.endTime,
+            duration: r.duration,
+            approver: r.approver || '',
+            confirmed: !!r.confirmed,
+            fiscalYear: r.fiscalYear,
+            note: r.note || ''
+        })) : [];
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'backup_hourly_leave.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (e) {
+        console.error('downloadHourlyJSON error', e);
+        showErrorPopup('ไม่สามารถสร้างไฟล์ JSON ลาชั่วโมงได้');
+    }
+};
+
+window.downloadNormalLeaveJSON = function() {
+    try {
+        const data = Array.isArray(allLeaveRecords) ? allLeaveRecords.map(r => ({
+            userNickname: r.userNickname,
+            leaveType: r.leaveType,
+            startDate: r.startDate,
+            endDate: r.endDate,
+            startPeriod: r.startPeriod || r.period || 'เต็มวัน',
+            endPeriod: r.endPeriod || r.period || 'เต็มวัน',
+            approver: r.approver || '',
+            status: r.status || '',
+            fiscalYear: r.fiscalYear,
+            note: r.note || ''
+        })) : [];
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'backup_full_day_leave.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (e) {
+        console.error('downloadNormalLeaveJSON error', e);
+        showErrorPopup('ไม่สามารถสร้างไฟล์ JSON การลาปกติได้');
+    }
 };
