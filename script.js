@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function(){
         sumTable.addEventListener('click', function(e){
             const el = e.target.closest('.clickable-name');
             if (!el) return;
-            const display = el.dataset.display || el.textContent;
+            const user = el.dataset.user; if(user){ showPersonHourlyHistory(user); return;} const display = el.dataset.display || el.textContent;
             const userNick = resolveUserNicknameFromDisplay(display);
             if (userNick) {
                 showPersonHourlyHistory(userNick);
@@ -1901,7 +1901,7 @@ function renderHourlySummary(summary) {
         // item.nickname is the display nickname (ไทย). We keep it and add clickable span.
         tbody.innerHTML += `
             <tr class="border-b hover:bg-gray-50">
-                <td class="px-4 py-3"><span class="clickable-name" data-display="${item.nickname}">${item.nickname}</span></td>
+                <td class="px-4 py-3"><span class="clickable-name" data-user="${item.userNickname||item.nickname}" data-display="${item.nickname}">${item.nickname}</span></td>
                 <td class="px-4 py-3"><span class="position-badge">${item.position || 'N/A'}</span></td>
                 <td class="px-4 py-3 text-right">${formatHoursAndMinutes(leaveHours)}</td>
                 <td class="px-4 py-3 text-right">${formatHoursAndMinutes(usedHours)}</td>
