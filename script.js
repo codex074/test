@@ -885,9 +885,9 @@ function calculateLeaveDays(startDate, endDate, startPeriod, endPeriod) {
     while (currentDate <= eDate) {
         const dateString = toYYYYMMDD(currentDate);
         const isWeekend = (currentDate.getDay() === 0 || currentDate.getDay() === 6);
-        const isHoliday = holidays.find(h => h.date === dateString);
+        const isHoliday = holidays[dateString]; // <-- แก้ไขตรงนี้
 
-        if (!isWeekend && !isHoliday) {
+        if (!isWeekend && !isHoliday) { // <-- แก้ไขตรงนี้ (ตรรกะเดิมยังใช้ได้)
             leaveDayCount++;
         }
 
@@ -896,14 +896,14 @@ function calculateLeaveDays(startDate, endDate, startPeriod, endPeriod) {
 
     // Adjust for half-day at start
     const sDateString = toYYYYMMDD(sDate);
-    const sDateIsWorkday = (sDate.getDay() !== 0 && sDate.getDay() !== 6 && !holidays.find(h => h.date === sDateString));
+    const sDateIsWorkday = (sDate.getDay() !== 0 && sDate.getDay() !== 6 && !holidays[sDateString]); // <-- แก้ไขตรงนี้
     if (sDateIsWorkday && startPeriod && startPeriod.includes('ครึ่งวัน')) {
         leaveDayCount -= 0.5;
     }
 
     // Adjust for half-day at end
     const eDateString = toYYYYMMDD(eDate);
-    const eDateIsWorkday = (eDate.getDay() !== 0 && eDate.getDay() !== 6 && !holidays.find(h => h.date === eDateString));
+    const eDateIsWorkday = (eDate.getDay() !== 0 && eDate.getDay() !== 6 && !holidays[eDateString]); // <-- แก้ไขตรงนี้
     if (eDateIsWorkday && endPeriod && endPeriod.includes('ครึ่งวัน')) {
         leaveDayCount -= 0.5;
     }
@@ -2575,17 +2575,17 @@ function renderMonthView() {
     for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
         const dateString = toLocalISOString(date);
-        const holidayInfo = holidays.find(h => h.date === dateString);
+        const holidayName = holidays[dateString]; // <-- แก้ไขตรงนี้
         
         const isTodayClass = date.toDateString() === today.toDateString() ? 'today-day' : '';
         const isWeekendClass = (date.getDay() === 0 || date.getDay() === 6) ? 'weekend-day' : 'bg-white';
-        const isHolidayClass = holidayInfo ? 'holiday-day' : '';
-        const dayNumberClass = holidayInfo ? 'text-red-700' : '';
+        const isHolidayClass = holidayName ? 'holiday-day' : ''; // <-- แก้ไขตรงนี้
+        const dayNumberClass = holidayName ? 'text-red-700' : ''; // <-- แก้ไขตรงนี้
 
         let dayEventsHtml = '';
 
-        if (holidayInfo) {
-            dayEventsHtml += `<div class="holiday-event">${holidayInfo.name}</div>`;
+        if (holidayName) { // <-- แก้ไขตรงนี้
+            dayEventsHtml += `<div class="holiday-event">${holidayName}</div>`; // <-- แก้ไขตรงนี้
         }
         
         let dayEvents = showFullDayLeaveOnCalendar ? allLeaveRecords.filter(r => {
@@ -2643,7 +2643,6 @@ function renderMonthView() {
 
     calendarGrid.innerHTML = gridHtml;
 }
-
 
 function renderDayView() {
     const container = document.getElementById('calendar-grid-container');
@@ -2907,7 +2906,17 @@ window.showLeaveDetailModal = function(id) {
             <p><b>ผู้อนุมัติ:</b> ${record.approver}</p>
         </div>
     `;
-    Swal.fire({ title: 'รายละเอียดการลา', html: html, confirmButtonText: 'ปิด' });
+    Swal.fire({
+        title: 'รายละเอียดการลา',
+        html: html,
+        showCancelButton: true,
+        confirmButtonText: 'ปิด',
+        cancelButtonText: 'แก้ไขรายการ'
+    }).then((result) => {
+        if (result.dismiss === Swal.DismissReason.cancel) {
+            editLeaveRecord(id);
+        }
+    });
 }
 
 
@@ -3126,7 +3135,7 @@ function renderAdminDashboard() {
             }
 
             return `
-            <div class="db-list-item">
+            <div class="db-list-item cursor-pointer" onclick="openPendingDetail('${recordType}','${recordId}')">
                 <div class="db-list-item-selector">
                     <input type="checkbox" class="pending-checkbox h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" data-id="${recordId}" data-type="${recordType}" onchange="updateBatchApproveButtonState()">
                 </div>
@@ -3249,3 +3258,255 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+
+
+
+// --- Added: open pending item detail from Admin Dashboard ---
+window.openPendingDetail = function(type, id) {
+    try {
+        if (type === 'leave') {
+            if (typeof showLeaveDetailModal === 'function') {
+                showLeaveDetailModal(id);
+            } else {
+                console.warn('showLeaveDetailModal not found');
+            }
+        } else {
+            if (typeof showHourlyDetailModal === 'function') {
+                showHourlyDetailModal(id);
+            } else {
+                console.warn('showHourlyDetailModal not found');
+            }
+        }
+    } catch (e) {
+        console.error('openPendingDetail error', e);
+    }
+};
+
+// --- Added: edit leave record flow for Admin (requires admin PIN verification) ---
+window.editLeaveRecord = async function(id) {
+    try {
+        const record = allLeaveRecords.find(r => r.id === id);
+        if (!record) return showErrorPopup('ไม่พบข้อมูลสำหรับแก้ไข');
+
+        const user = users.find(u => u.nickname === record.userNickname) || {};
+        const dateDisplay = record.startDate === record.endDate ? formatDateThaiShort(record.startDate) : (formatDateThaiShort(record.startDate) + ' - ' + formatDateThaiShort(record.endDate));
+
+        const { value: formValues } = await Swal.fire({
+            title: 'แก้ไขรายการลา',
+            html: `
+                <div style="text-align:left">
+                    <label class="swal-left">ผู้ลา</label>
+                    <input id="edit-user-nickname" class="swal2-input" value="${record.userNickname}" readonly>
+                    <label class="swal-left">ประเภทการลา</label>
+                    <select id="edit-leave-type" class="swal2-select">
+                        <option value="ลาป่วย" ${record.leaveType === 'ลาป่วย' ? 'selected' : ''}>ลาป่วย</option>
+                        <option value="ลากิจ" ${record.leaveType === 'ลากิจ' ? 'selected' : ''}>ลากิจ</option>
+                        <option value="ลาพักผ่อน" ${record.leaveType === 'ลาพักผ่อน' ? 'selected' : ''}>ลาพักผ่อน</option>
+                        <option value="ลาคลอด" ${record.leaveType === 'ลาคลอด' ? 'selected' : ''}>ลาคลอด</option>
+                    </select>
+                    <label class="swal-left">วันที่เริ่ม</label>
+                    <input id="edit-start-date" type="date" class="swal2-input" value="${record.startDate}">
+                    <label class="swal-left">วันที่สิ้นสุด</label>
+                    <input id="edit-end-date" type="date" class="swal2-input" value="${record.endDate}">
+                    <label class="swal-left">ช่วงเริ่ม</label>
+                    <select id="edit-start-period" class="swal2-select">
+                        <option ${record.startPeriod === 'เต็มวัน' ? 'selected' : ''}>เต็มวัน</option>
+                        <option ${record.startPeriod === 'ครึ่งวัน-เช้า' ? 'selected' : ''}>ครึ่งวัน-เช้า</option>
+                        <option ${record.startPeriod === 'ครึ่งวัน-บ่าย' ? 'selected' : ''}>ครึ่งวัน-บ่าย</option>
+                    </select>
+                    <label class="swal-left">ช่วงสิ้นสุด</label>
+                    <select id="edit-end-period" class="swal2-select">
+                        <option ${record.endPeriod === 'เต็มวัน' ? 'selected' : ''}>เต็มวัน</option>
+                        <option ${record.endPeriod === 'ครึ่งวัน-เช้า' ? 'selected' : ''}>ครึ่งวัน-เช้า</option>
+                        <option ${record.endPeriod === 'ครึ่งวัน-บ่าย' ? 'selected' : ''}>ครึ่งวัน-บ่าย</option>
+                    </select>
+                    <label class="swal-left">ผู้อนุมัติ</label>
+                    <input id="edit-approver" class="swal2-input" value="${record.approver || ''}">
+                    <label class="swal-left">หมายเหตุ</label>
+                    <textarea id="edit-note" class="swal2-textarea">${record.note || ''}</textarea>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'บันทึก',
+            cancelButtonText: 'ยกเลิก',
+            preConfirm: () => {
+                return {
+                    userNickname: document.getElementById('edit-user-nickname').value,
+                    leaveType: document.getElementById('edit-leave-type').value,
+                    startDate: document.getElementById('edit-start-date').value,
+                    endDate: document.getElementById('edit-end-date').value,
+                    startPeriod: document.getElementById('edit-start-period').value,
+                    endPeriod: document.getElementById('edit-end-period').value,
+                    approver: document.getElementById('edit-approver').value,
+                    note: document.getElementById('edit-note').value
+                };
+            }
+        });
+
+        if (!formValues) return;
+
+        // require admin PIN of the approver (if approver exists) OR require any admin PIN if approver missing
+        const adminToCheck = formValues.approver || record.approver || (admins[0] && admins[0].username) || null;
+        if (!adminToCheck) {
+            return showErrorPopup('ไม่พบผู้อนุมัติในระบบ กรุณากำหนดผู้อนุมัติก่อนแก้ไข');
+        }
+
+        const confirmHtml = `
+            <p>ยืนยันการแก้ไขรายการของ: <b>${user.fullname || record.userNickname}</b></p>
+            <p>ประเภท: ${formValues.leaveType}</p>
+            <p>ช่วงวันที่: ${formValues.startDate} - ${formValues.endDate}</p>
+        `;
+
+        const isPinCorrect = await confirmWithAdminPin(adminToCheck, confirmHtml);
+        if (!isPinCorrect) return;
+
+        showLoadingPopup('กำลังบันทึกการแก้ไข...');
+        try {
+            const recordDoc = doc(db, 'leaveRecords', id);
+            await updateDoc(recordDoc, {
+                leaveType: formValues.leaveType,
+                startDate: formValues.startDate,
+                endDate: formValues.endDate,
+                startPeriod: formValues.startPeriod,
+                endPeriod: formValues.endPeriod,
+                approver: formValues.approver || null,
+                note: formValues.note || ''
+            });
+            showSuccessPopup('บันทึกการแก้ไขสำเร็จ');
+            renderAdminDashboard();
+        } catch (err) {
+            console.error('Error updating leave record', err);
+            showErrorPopup('เกิดข้อผิดพลาดขณะบันทึก');
+        }
+
+    } catch (e) {
+        console.error('editLeaveRecord error', e);
+        showErrorPopup('เกิดข้อผิดพลาด');
+    }
+};
+
+
+
+/* --- New showHourlyDetailModal (Enhanced UI) --- */
+window.showHourlyDetailModal = function(id) {
+    const record = allHourlyRecords.find(r => r.id === id);
+    if (!record) return showErrorPopup('ไม่พบข้อมูล');
+
+    const user = users.find(u => u.nickname === record.userNickname) || {};
+    const durationText = formatHoursAndMinutes(record.duration);
+    const label = record.type === 'leave' ? 'ลาชั่วโมง' : 'ใช้ชั่วโมง';
+    const tagClass = record.type === 'leave' ? 'modal-tag-red' : 'modal-tag-green';
+    const textClass = record.type === 'leave' ? 'hourly-text-red' : 'hourly-text-green';
+
+    const modalHtml = `
+        <div class="space-y-3 text-left p-4">
+            <p><strong>ชื่อ-สกุล:</strong> ${user.fullname} (${user.nickname})</p>
+            <p><strong>ตำแหน่ง:</strong> ${user.position || '-'}</p>
+            <hr class="my-2">
+            <p><strong>ประเภท:</strong> <span class="modal-tag ${tagClass}">${label}</span></p>
+            <p><strong>วันที่:</strong> ${formatDateThaiShort(record.date)}</p>
+            <p><strong>ช่วงเวลา:</strong> ${record.startTime} - ${record.endTime}</p>
+            <p><strong>รวม:</strong> <span class="${textClass}">${durationText}</span></p>
+            <p><strong>ผู้อนุมัติ:</strong> ${record.approver || '-'}</p>
+            <p><strong>สถานะ:</strong> 
+                <span class="font-semibold ${record.confirmed ? 'text-green-600' : 'text-yellow-500'}">
+                    ${record.confirmed ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+                </span>
+            </p>
+            <p><strong>หมายเหตุ:</strong> ${record.note || '-'}</p>
+            <hr class="my-2">
+            <p class="text-xs text-gray-500"><strong>วันที่แจ้ง:</strong> 
+                ${record.createdDate ? formatDateTimeThaiShort(record.createdDate) : '-'}
+            </p>
+        </div>
+    `;
+
+    Swal.fire({
+        title: 'รายละเอียดลาชั่วโมง',
+        html: modalHtml,
+        width: '480px',
+        showCancelButton: true,
+        confirmButtonText: 'ปิด',
+        cancelButtonText: 'แก้ไขรายการ'
+    }).then((result) => {
+        if (result.dismiss === Swal.DismissReason.cancel) {
+            editHourlyRecord(id);
+        }
+    });
+};
+
+
+
+/* --- Enhanced UI editHourlyRecord --- */
+window.editHourlyRecord = async function(id) {
+    const record = allHourlyRecords.find(r => r.id === id);
+    if (!record) return showErrorPopup('ไม่พบข้อมูล');
+
+    const { value: form } = await Swal.fire({
+        title: 'แก้ไขลาชั่วโมง',
+        width: '600px',
+        html: `
+            <style>
+                .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px; text-align:left; }
+                .form-grid-full { grid-column: span 2; }
+                .swal-label { font-weight:600; font-size:14px; margin-bottom:3px; display:block; }
+                .swal-input { width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:6px; }
+                textarea.swal-input { height:70px; resize:none; }
+            </style>
+            <div class="form-grid">
+                <div class="form-grid-full">
+                    <label class="swal-label">ผู้ลา</label>
+                    <input class="swal-input" value="${record.userNickname}" readonly>
+                </div>
+                <div>
+                    <label class="swal-label">วันที่</label>
+                    <input id="eh-date" type="date" class="swal-input" value="${record.date}">
+                </div>
+                <div>
+                    <label class="swal-label">ประเภท</label>
+                    <select id="eh-type" class="swal-input">
+                        <option value="leave" ${record.type==='leave'?'selected':''}>ลาชั่วโมง</option>
+                        <option value="use" ${record.type==='use'?'selected':''}>ใช้ชั่วโมง</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="swal-label">เวลาเริ่ม</label>
+                    <input id="eh-start" type="time" class="swal-input" value="${record.startTime}">
+                </div>
+                <div>
+                    <label class="swal-label">เวลาสิ้นสุด</label>
+                    <input id="eh-end" type="time" class="swal-input" value="${record.endTime}">
+                </div>
+                <div class="form-grid-full">
+                    <label class="swal-label">ผู้อนุมัติ</label>
+                    <input id="eh-apr" class="swal-input" value="${record.approver || ''}">
+                </div>
+                <div class="form-grid-full">
+                    <label class="swal-label">หมายเหตุ</label>
+                    <textarea id="eh-note" class="swal-input">${record.note || ''}</textarea>
+                </div>
+            </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        cancelButtonText: 'ยกเลิก',
+        preConfirm: () => {
+            return {
+                date: document.getElementById('eh-date').value,
+                type: document.getElementById('eh-type').value,
+                startTime: document.getElementById('eh-start').value,
+                endTime: document.getElementById('eh-end').value,
+                approver: document.getElementById('eh-apr').value,
+                note: document.getElementById('eh-note').value
+            };
+        }
+    });
+
+    if (!form) return;
+
+    if (!await confirmWithAdminPin(form.approver, '<p>ยืนยันการแก้ไขลาชั่วโมง</p>')) return;
+
+    await updateDoc(doc(db, "hourlyRecords", id), form);
+    showSuccessPopup('อัปเดตสำเร็จ');
+    renderAdminDashboard();
+};
