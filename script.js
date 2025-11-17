@@ -1759,7 +1759,7 @@ function applyHourlyFiltersAndRender() {
     });
 
     filteredSummaryUsers.forEach(u => { 
-        summaryMap[u.nickname] = { nickname: u.nickname, fullname: u.fullname, position: u.position, leaveHours: 0, usedHours: 0 }; 
+        summaryMap[u.nickname] = { nickname: u.nickname, position: u.position, leaveHours: 0, usedHours: 0 }; 
     });
     
     allHourlyRecords.forEach(r => {
@@ -1901,9 +1901,6 @@ function renderHourlySummary(summary) {
         // item.nickname is the display nickname (ไทย). We keep it and add clickable span.
         tbody.innerHTML += `
             <tr class="border-b hover:bg-gray-50">
-                <td class="px-4 py-3">
-                    <span class="clickable-name" data-user="${item.userNickname||item.nickname}" data-display="${item.fullname||item.nickname}">${item.fullname || '-'}</span>
-                </td>
                 <td class="px-4 py-3"><span class="clickable-name" data-user="${item.userNickname||item.nickname}" data-display="${item.nickname}">${item.nickname}</span></td>
                 <td class="px-4 py-3"><span class="position-badge">${item.position || 'N/A'}</span></td>
                 <td class="px-4 py-3 text-right">${formatHoursAndMinutes(leaveHours)}</td>
@@ -3081,7 +3078,7 @@ async function exportAllDataToExcel() {
         const fiscalYear = getCurrentFiscalYear();
         const summaryMap = {};
         users.forEach(u => {
-            summaryMap[u.nickname] = { nickname: u.nickname, fullname: u.fullname, position: u.position, leaveHours: 0, usedHours: 0 };
+            summaryMap[u.nickname] = { nickname: u.nickname, position: u.position, leaveHours: 0, usedHours: 0 };
         });
         allHourlyRecords.forEach(r => {
             if (r.fiscalYear === fiscalYear && summaryMap[r.userNickname] && r.confirmed) {
@@ -3773,19 +3770,3 @@ document.addEventListener('DOMContentLoaded', function(){
         });
     }
 });
-
-
-// Delegated handler for clickable-name elements (fullname or nickname) -> show person's hourly history
-(function(){
-    if (typeof window.showPersonHourlyHistory !== 'function') return;
-    document.addEventListener('click', function(e){
-        const el = e.target.closest && e.target.closest('.clickable-name');
-        if(!el) return;
-        const user = el.dataset && (el.dataset.user || el.dataset.display);
-        if(!user) return;
-        // try to resolve to nickname if fullname given
-        const u = (users || []).find(u => u.nickname === user || u.fullname === user);
-        const nickname = u ? u.nickname : user;
-        try { showPersonHourlyHistory(nickname); } catch(err){ console.warn('showPersonHourlyHistory error', err); }
-    });
-})();
