@@ -3574,28 +3574,50 @@ window.downloadNormalLeaveJSON = function() {
     }
 };
 
-// === Added enhancements ===
-document.addEventListener('DOMContentLoaded', ()=>{
-  const tbl = document.getElementById('hourly-summary-table');
-  if(tbl){
-    tbl.addEventListener('click', (e)=>{
-      const cell = e.target.closest('td');
-      if(!cell) return;
-      const idx = Array.from(cell.parentNode.children).indexOf(cell);
-      if(idx===0){ // first column = nickname
-        const name = cell.textContent.trim();
-        if(name) showPersonHourlyHistory(name);
-      }
-    });
-  }
-});
 
-window.showPersonHourlyHistory = function(nickname){
-  const records = (window.allHourlyRecords||[]).filter(r=>r.nickname===nickname);
-  let html = '<div>';
-  records.forEach(r=>{
-    html += `<div><b>วันที่:</b> ${r.date}<br><b>ประเภท:</b> ${r.type}</div><hr>`;
-  });
-  html+='</div>';
-  Swal.fire({title:`ประวัติของ ${nickname}`, html});
+
+/* === Added Enhancements (final integration) === */
+
+// Replace summary nickname with clickable
+window.showPersonHourlyHistory = function(nickname) {
+    const records = (window.allHourlyRecords || [])
+        .filter(r => r.nickname === nickname)
+        .sort((a,b)=> new Date(b.date) - new Date(a.date));
+    if(records.length===0){
+        Swal.fire("ไม่มีประวัติ", `ไม่พบข้อมูลของ ${nickname}`, "info");
+        return;
+    }
+    let html = `<div style="max-height:450px;overflow-y:auto;text-align:left;padding:10px;">`;
+    records.forEach(r=>{
+        html += `
+        <div class="border-b py-2">
+            <div><b>วันที่:</b> ${r.date}</div>
+            <div><b>ประเภท:</b> ${r.hourlyType === "leave" ? "ลาชั่วโมง" : "ใช้ชั่วโมง"}</div>
+            <div><b>เวลา:</b> ${r.startTime} - ${r.endTime}</div>
+            <div><b>ผู้อนุมัติ:</b> ${r.approver || "-"}</div>
+            <div><b>หมายเหตุ:</b> ${r.note || "-"}</div>
+            <div><b>สถานะ:</b> ${r.confirmed ? "✔ อนุมัติแล้ว" : "⏳ รออนุมัติ"}</div>
+        </div>`;
+    });
+    html += `</div>`;
+    Swal.fire({title:`ประวัติของ ${nickname}`, html, width:600});
 };
+
+// Remove edit button on approved record inside modal
+window.buildHourlyEditButtons = function(rec){
+    if(rec.confirmed) return "";
+    return `<button onclick="saveHourlyEdit('${rec.id}')" class="bg-blue-600 text-white px-4 py-2 rounded-lg">บันทึก</button>`;
+};
+
+// Make hourly rows clickable
+document.addEventListener("DOMContentLoaded", ()=>{
+    const tbl = document.getElementById("hourly-records-table");
+    if(tbl){
+        tbl.addEventListener("click",(e)=>{
+            const tr = e.target.closest("tr");
+            if(!tr) return;
+            const id = tr.dataset.id;
+            if(id) openHourlyDetailsModal(id);
+        });
+    }
+});

@@ -1606,10 +1606,20 @@ button[type="submit"]:active, .generic-button:active {
     font-size: 0.875rem;
 }
 
-/* clickable nickname */
-.clickable-name, #hourly-summary-table td:first-child {
-  cursor: pointer;
-  color: #4f46e5;
-  font-weight: 600;
+
+/* === Clickable Hourly Rows === */
+.clickable-hourly-row {
+    cursor: pointer;
 }
-#hourly-summary-table td:first-child:hover { text-decoration: underline; }
+.clickable-hourly-row:hover {
+    background-color: #f3f4f6;
+}
+/* clickable name */
+.clickable-name {
+    cursor: pointer;
+    color: #4f46e5;
+    font-weight: 600;
+}
+.clickable-name:hover {
+    text-decoration: underline;
+}
