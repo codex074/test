@@ -141,21 +141,7 @@ let pendingFilterType = 'all';
 let pendingApproverFilter = 'all';
 
 // --- INITIALIZATION ---
-document.addEventListener('DOMContentLoaded', () => {
 
-    // Fallback: auto-hide initial loader in case listeners fail or permissions block
-    if (!__initialLoaderTimer) {
-        __initialLoaderTimer = setTimeout(() => hideInitialLoader(), 8000);
-    }    showTab('hourly');
-    populateFiscalYearFilters();
-    initializeDataListeners();
-    initializePinListener();
-    setDefaultDate();
-    setupFormConstraints();
-    setupEventListeners();
-    updateDateTime();
-    setInterval(updateDateTime, 1000);
-});
 
 function setupEventListeners() {
     const registerForm = document.getElementById('register-form');
@@ -1882,44 +1868,6 @@ function renderUsersTable() {
 }
 
 
-function renderHourlySummary(summary) {
-    const tbody = document.getElementById('hourly-summary-table');
-    if(!tbody) return;
-    tbody.innerHTML = '';
-
-    const totalRecords = summary.length;
-    const totalPages = Math.ceil(totalRecords / summaryRecordsPerPage) || 1;
-    hourlySummaryCurrentPage = Math.max(1, Math.min(hourlySummaryCurrentPage, totalPages));
-
-    const startIndex = (hourlySummaryCurrentPage - 1) * summaryRecordsPerPage;
-    const paginatedData = summary.slice(startIndex, startIndex + summaryRecordsPerPage);
-
-    paginatedData.forEach(item => {
-        const leaveHours = item.leaveHours !== undefined ? item.leaveHours : (item['ชั่วโมงที่ลา (อนุมัติ)'] || 0);
-        const usedHours = item.usedHours !== undefined ? item.usedHours : (item['ชั่วโมงที่ใช้ (อนุมัติ)'] || 0);
-        const balance = (item.balance !== undefined) ? item.balance : (usedHours - leaveHours);
-        // item.nickname is the display nickname (ไทย). We keep it and add clickable span.
-        tbody.innerHTML += `
-            <tr class="border-b hover:bg-gray-50">
-                <td class="px-4 py-3"><span class="clickable-name" data-user="${item.userNickname||item.nickname}" data-display="${item.nickname}">${item.nickname}</span></td>
-                <td class="px-4 py-3"><span class="position-badge">${item.position || 'N/A'}</span></td>
-                <td class="px-4 py-3 text-right">${formatHoursAndMinutes(leaveHours)}</td>
-                <td class="px-4 py-3 text-right">${formatHoursAndMinutes(usedHours)}</td>
-                <td class="px-4 py-3 text-right font-semibold">${formatHoursAndMinutes(balance)}</td>
-            </tr>
-        `;
-    });
-
-    const pageInfo = document.getElementById('hourly-summary-page-info');
-    const prevBtn = document.getElementById('hourly-summary-prev-btn');
-    const nextBtn = document.getElementById('hourly-summary-next-btn');
-    
-    if(pageInfo) pageInfo.textContent = `หน้า ${hourlySummaryCurrentPage} / ${totalPages}`;
-    if(prevBtn) prevBtn.disabled = hourlySummaryCurrentPage === 1;
-    if(nextBtn) nextBtn.disabled = hourlySummaryCurrentPage === totalPages;
-}
-
-
 function renderRankings(summary) {
     const negativeDiv = document.getElementById('negative-ranking');
     const positiveDiv = document.getElementById('positive-ranking');
@@ -1963,47 +1911,6 @@ function renderRankings(summary) {
     positiveDiv.classList.add('positive');
 }
 
-
-function renderHourlyRecords(records) {
-    const tbody = document.getElementById('hourly-records-table');
-    if(!tbody) return;
-    tbody.innerHTML = '';
-
-    const totalRecords = records.length;
-    const totalPages = Math.ceil(totalRecords / recordsPerPage);
-    hourlyRecordsCurrentPage = Math.max(1, Math.min(hourlyRecordsCurrentPage, totalPages || 1));
-
-    const startIndex = (hourlyRecordsCurrentPage - 1) * recordsPerPage;
-    const paginatedRecords = records.sort((a,b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0)).slice(startIndex, startIndex + recordsPerPage);
-
-    paginatedRecords.forEach(r => {
-        const user = users.find(u => u.nickname === r.userNickname) || {};
-        const statusText = r.confirmed ? 'อนุมัติแล้ว' : 'รออนุมัติ';
-        const statusClass = r.confirmed ? 'text-green-500' : 'text-yellow-500';
-
-        tbody.innerHTML += `
-        <tr class="border-b hover:bg-gray-50" data-id="${r.id}" onclick="showHourlyDetailModal('${r.id}')">
-            <td class="px-4 py-3">${formatDateThaiShort(r.date)}</td>
-            <td class="px-4 py-3">${r.userNickname}</td>
-            <td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(user.position)}">${user.position || 'N/A'}</span></td>
-            <td class="px-4 py-3 font-semibold ${r.type === 'leave' ? 'text-red-500':'text-green-500'}">${r.type === 'leave' ? 'ลา' : 'ใช้'}</td>
-            <td class="px-4 py-3">${r.startTime}-${r.endTime} <span class="font-semibold ${r.type === 'leave' ? 'text-red-500' : 'text-green-500'}">(${formatHoursAndMinutes(r.duration)})</span></td>
-            <td class="px-4 py-3">${r.approver || '-'}</td>
-            <td class="px-4 py-3 font-semibold ${statusClass}">${statusText}</td>
-            <td class="px-4 py-3 flex items-center space-x-1">
-                <button onclick="manageRecord('deleteHourly', '${r.id}')" class="p-2 rounded-full hover:bg-red-100 text-red-600" title="ลบ"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg></button>
-            </td>
-        </tr>`;
-    });
-    
-    const pageInfo = document.getElementById('hourly-page-info');
-    const prevBtn = document.getElementById('hourly-prev-btn');
-    const nextBtn = document.getElementById('hourly-next-btn');
-    
-    if(pageInfo) pageInfo.textContent = `หน้า ${hourlyRecordsCurrentPage} / ${totalPages || 1}`;
-    if(prevBtn) prevBtn.disabled = hourlyRecordsCurrentPage === 1;
-    if(nextBtn) nextBtn.disabled = hourlyRecordsCurrentPage === totalPages || totalPages === 0;
-}
 
 function renderLeaveSummary(summaryData) {
     const tbody = document.getElementById('leave-summary-table');
@@ -3725,19 +3632,7 @@ window.showHourlyRecordDetails = function(recOrId){
 };
 
 // Delegated click handling for summary and records tables
-document.addEventListener('DOMContentLoaded', function(){
-    // Summary table: click on first column -> show history
-    const sumTable = document.getElementById('hourly-summary-table');
-    if(sumTable){
-        sumTable.addEventListener('click', function(e){
-            const td = e.target.closest('td');
-            if(!td) return;
-            // assume first column is nickname
-            const tr = td.parentElement;
-            const tds = Array.from(tr.children);
-            const nickname = (tds[1] ? tds[1].textContent : td.textContent).trim() || td.textContent.trim(); // sometimes 2nd column
-            if(nickname) showPersonHourlyHistory(nickname);
-        });
+
     }
 
     // Records table: clicking a row will open details modal (try to resolve record)
@@ -3772,10 +3667,7 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 
-// ---- appended overrides (2025-11-17T15:11:23.765640Z) ----
-
-
-/* --- OVERRIDE: Reliable renderHourlySummary and renderHourlyRecords to ensure clickable names --- */
+// /* --- OVERRIDE: Reliable renderHourlySummary and renderHourlyRecords to ensure clickable names --- */
 function renderHourlySummary(summary) {
     const tbody = document.getElementById('hourly-summary-table');
     if(!tbody) return;
