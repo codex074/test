@@ -1605,3 +1605,8 @@ button[type="submit"]:active, .generic-button:active {
     color: #9ca3af;
     font-size: 0.875rem;
 }
+
+
+/* Added interactivity for clickable names */
+.cursor-pointer { cursor: pointer; }
+.summary-name:hover { color: #7c3aed !important; text-decoration: underline; }
