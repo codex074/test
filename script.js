@@ -3510,3 +3510,53 @@ window.editHourlyRecord = async function(id) {
     showSuccessPopup('อัปเดตสำเร็จ');
     renderAdminDashboard();
 };
+
+
+// Backup JSON modal control
+window.openBackupMenu = function() {
+    document.getElementById("backup-modal").classList.remove("hidden");
+};
+window.closeBackupMenu = function() {
+    document.getElementById("backup-modal").classList.add("hidden");
+};
+
+// JSON download functions
+window.downloadHourlyJSON = function() {
+    const data = allHourlyRecords.map(r => ({
+        userNickname: r.userNickname,
+        type: r.type,
+        date: r.date,
+        startTime: r.startTime,
+        endTime: r.endTime,
+        duration: r.duration,
+        approver: r.approver || "",
+        confirmed: r.confirmed || false,
+        fiscalYear: r.fiscalYear,
+        note: r.note || ""
+    }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "backup_hourly_leave.json";
+    a.click();
+};
+
+window.downloadNormalLeaveJSON = function() {
+    const data = allLeaveRecords.map(r => ({
+        userNickname: r.userNickname,
+        leaveType: r.leaveType,
+        startDate: r.startDate,
+        endDate: r.endDate,
+        startPeriod: r.startPeriod,
+        endPeriod: r.endPeriod,
+        approver: r.approver,
+        status: r.status,
+        fiscalYear: r.fiscalYear,
+        note: r.note || ""
+    }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "backup_full_day_leave.json";
+    a.click();
+};
