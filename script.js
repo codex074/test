@@ -3573,3 +3573,45 @@ window.downloadNormalLeaveJSON = function() {
         showErrorPopup('ไม่สามารถสร้างไฟล์ JSON การลาปกติได้');
     }
 };
+
+
+// --- Enhancements: hide edit for approved, user history, pointer cursor ---
+
+// Wrap admin edit modal to hide edit controls if approved
+if (typeof window.openAdminEditModal === 'function') {
+  const _origOpen = window.openAdminEditModal;
+  window.openAdminEditModal = function(rec){
+    _origOpen(rec);
+    const approved = rec.confirmed === true || rec.status === "อนุมัติแล้ว";
+    if (approved) {
+      const modal = document.getElementById("admin-edit-modal");
+      if (modal){
+        const buttons = modal.querySelectorAll("button");
+        buttons.forEach(btn=>{
+          if(btn.textContent.includes("บันทึก")) btn.style.display="none";
+        });
+      }
+    }
+  }
+}
+
+// Show user hourly history via Swal
+window.showUserHourlyHistory = function(nick){
+  const list = (window.allHourlyRecords||[]).filter(r=>r.userNickname===nick);
+  let html="";
+  list.forEach(r=>{
+    html+=`
+      <div class="border-b py-2">
+        <div><b>วันที่:</b> ${r.date}</div>
+        <div><b>เวลา:</b> ${r.startTime} - ${r.endTime}</div>
+        <div><b>ชั่วโมง:</b> ${r.duration}</div>
+        <div><b>หมายเหตุ:</b> ${r.note||"-"}</div>
+        <div><b>สถานะ:</b> ${r.confirmed ? "อนุมัติแล้ว" : "รออนุมัติ"}</div>
+      </div>`;
+  });
+  if(window.Swal){
+    Swal.fire({title:`ประวัติชั่วโมง (${nick})`, html:`<div style="text-align:left">${html}</div>`, width:500});
+  } else {
+    alert("ประวัติชั่วโมง:\n"+JSON.stringify(list,null,2));
+  }
+};
