@@ -1606,6 +1606,4 @@ button[type="submit"]:active, .generic-button:active {
     font-size: 0.875rem;
 }
 
-
-/* clickable pointer enhancements */
-.cursor-pointer, .clickable, .hover-pointer:hover { cursor: pointer; }
+.cursor-pointer{cursor:pointer;}

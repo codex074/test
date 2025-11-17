@@ -58,15 +58,15 @@
             <button onclick="showTab('pin')" class="menu-item menu-item-yellow w-full text-left bg-white rounded-xl p-4 shadow-md" id="pin-tab">
                 <div class="flex items-center"><div class="text-3xl mr-4">🔑</div><div><h3 class="text-lg font-semibold text-gray-800">จัดการ PIN</h3><p class="text-sm text-gray-600">ตั้งค่ารหัส PIN </p></div></div>
             </button>
-            <button onclick="openBackupMenu()" class="menu-item menu-item-green w-full text-left bg-white rounded-xl p-4 shadow-md">
-    <div class="flex items-center">
-        <div class="text-3xl mr-4">💾</div>
-        <div>
-            <h3 class="text-lg font-semibold text-gray-800">Backup ข้อมูล</h3>
-            <p class="text-sm text-gray-600">Excel / JSON</p>
-        </div>
-    </div>
-</button>
+            <button id="export-btn" class="menu-item menu-item-green w-full text-left bg-white rounded-xl p-4 shadow-md">
+                <div class="flex items-center">
+                    <div class="text-3xl mr-4">💾</div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Backup ข้อมูล</h3>
+                        <p class="text-sm text-gray-600">ส่งออกข้อมูลเป็นไฟล์ Excel</p>
+                    </div>
+                </div>
+            </button>
             <button onclick="showTab('admin-dashboard')" class="menu-item menu-item-gray w-full text-left bg-white rounded-xl p-4 shadow-md" id="admin-dashboard-tab">
                 <div class="flex items-center">
                     <div class="text-3xl mr-4">👑</div>
@@ -431,34 +431,6 @@
             พัฒนาโดย ภก.ธีรเดช วิชัย - โรงพยาบาลอุตรดิตถ์
         </div>
     </footer>
-
-<!-- Backup Modal -->
-<div id="backup-modal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-  <div class="bg-white p-6 rounded-xl w-full max-w-sm">
-      <h2 class="text-xl font-bold mb-4 text-center">Backup ข้อมูล</h2>
-
-      <button onclick="downloadHourlyJSON()" 
-          class="w-full bg-blue-600 text-white py-2 rounded-lg mb-3">
-          ⏰ ลาชั่วโมง (JSON)
-      </button>
-
-      <button onclick="downloadNormalLeaveJSON()" 
-          class="w-full bg-green-600 text-white py-2 rounded-lg">
-          📄 แจ้งลาปกติ (JSON)
-      </button>
-
-      <button onclick="exportAllDataToExcel()"
-          class="w-full bg-purple-600 text-white py-2 rounded-lg mt-2">
-          📊 Backup Excel
-      </button>
-
-      <button onclick="closeBackupMenu()"
-          class="mt-4 w-full bg-gray-300 py-2 rounded-lg">
-          ปิด
-      </button>
-  </div>
-</div>
-
 </body>
 
 </html>

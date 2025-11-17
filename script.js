@@ -1796,7 +1796,7 @@ function renderUsersTable() {
 
     paginatedUsers.forEach(user => {
         tbody.innerHTML += `
-            <tr class="border-b hover:bg-gray-50">
+            <tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="showHourlyDetailModal('${r.id}')">
                 <td class="px-4 py-3">${user.fullname}</td>
                 <td class="px-4 py-3">${user.nickname}</td>
                 <td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(user.position)}">${user.position}</span></td>
@@ -1834,7 +1834,7 @@ function renderHourlySummary(summary) {
 
     paginatedData.forEach(item => {
         const balance = item.balance;
-        tbody.innerHTML += `<tr class="border-b hover:bg-gray-50"><td class="px-4 py-3">${item.nickname}</td><td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(item.position)}">${item.position}</span></td><td class="px-4 py-3">${formatHoursAndMinutes(item.leaveHours)}</td><td class="px-4 py-3">${formatHoursAndMinutes(item.usedHours)}</td><td class="px-4 py-3 font-semibold ${balance < 0 ? 'text-red-500' : 'text-green-500'}">${formatHoursAndMinutes(Math.abs(balance))}</td><td class="px-4 py-3 font-semibold ${balance < 0 ? 'text-red-500' : 'text-green-500'}">${balance >= 0 ? 'OK' : 'ติดลบ'}</td></tr>`;
+        tbody.innerHTML += `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="showHourlyDetailModal('${r.id}')"><td class="px-4 py-3">${item.nickname}</td><td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(item.position)}">${item.position}</span></td><td class="px-4 py-3">${formatHoursAndMinutes(item.leaveHours)}</td><td class="px-4 py-3">${formatHoursAndMinutes(item.usedHours)}</td><td class="px-4 py-3 font-semibold ${balance < 0 ? 'text-red-500' : 'text-green-500'}">${formatHoursAndMinutes(Math.abs(balance))}</td><td class="px-4 py-3 font-semibold ${balance < 0 ? 'text-red-500' : 'text-green-500'}">${balance >= 0 ? 'OK' : 'ติดลบ'}</td></tr>`;
     });
 
     const pageInfo = document.getElementById('hourly-summary-page-info');
@@ -1908,7 +1908,7 @@ function renderHourlyRecords(records) {
         const statusClass = r.confirmed ? 'text-green-500' : 'text-yellow-500';
 
         tbody.innerHTML += `
-        <tr class="border-b hover:bg-gray-50" data-id="${r.id}" onclick="showHourlyDetailModal('${r.id}')">
+        <tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="showHourlyDetailModal('${r.id}')">
             <td class="px-4 py-3">${formatDateThaiShort(r.date)}</td>
             <td class="px-4 py-3">${r.userNickname}</td>
             <td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(user.position)}">${user.position || 'N/A'}</span></td>
@@ -1944,7 +1944,7 @@ function renderLeaveSummary(summaryData) {
     const paginatedData = summaryData.slice(startIndex, startIndex + summaryRecordsPerPage);
 
     paginatedData.forEach((user) => {
-         tbody.innerHTML += `<tr class="border-b hover:bg-gray-50"><td class="px-4 py-3"><a href="#" onclick="event.preventDefault(); showLeaveDetailPopup('${user.nickname}')" class="text-purple-600 hover:underline">${user.fullname}</a></td><td class="px-4 py-3">${user.nickname}</td><td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(user.position)}">${user.position}</span></td><td class="px-4 py-3 font-semibold">${user.totalDays} วัน</td></tr>`;
+         tbody.innerHTML += `<tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="showHourlyDetailModal('${r.id}')"><td class="px-4 py-3"><a href="#" onclick="event.preventDefault(); showLeaveDetailPopup('${user.nickname}')" class="text-purple-600 hover:underline">${user.fullname}</a></td><td class="px-4 py-3">${user.nickname}</td><td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(user.position)}">${user.position}</span></td><td class="px-4 py-3 font-semibold">${user.totalDays} วัน</td></tr>`;
     });
 
     const pageInfo = document.getElementById('summary-page-info');
@@ -3511,107 +3511,30 @@ window.editHourlyRecord = async function(id) {
     renderAdminDashboard();
 };
 
-
-// --- Backup JSON modal control and download functions ---
-window.openBackupMenu = function() {
-    const m = document.getElementById('backup-modal');
-    if (m) m.classList.remove('hidden');
-};
-window.closeBackupMenu = function() {
-    const m = document.getElementById('backup-modal');
-    if (m) m.classList.add('hidden');
-};
-
-window.downloadHourlyJSON = function() {
-    try {
-        const data = Array.isArray(allHourlyRecords) ? allHourlyRecords.map(r => ({
-            userNickname: r.userNickname,
-            type: r.type,
-            date: r.date,
-            startTime: r.startTime,
-            endTime: r.endTime,
-            duration: r.duration,
-            approver: r.approver || '',
-            confirmed: !!r.confirmed,
-            fiscalYear: r.fiscalYear,
-            note: r.note || ''
-        })) : [];
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'backup_hourly_leave.json';
-        a.click();
-        URL.revokeObjectURL(a.href);
-    } catch (e) {
-        console.error('downloadHourlyJSON error', e);
-        showErrorPopup('ไม่สามารถสร้างไฟล์ JSON ลาชั่วโมงได้');
-    }
-};
-
-window.downloadNormalLeaveJSON = function() {
-    try {
-        const data = Array.isArray(allLeaveRecords) ? allLeaveRecords.map(r => ({
-            userNickname: r.userNickname,
-            leaveType: r.leaveType,
-            startDate: r.startDate,
-            endDate: r.endDate,
-            startPeriod: r.startPeriod || r.period || 'เต็มวัน',
-            endPeriod: r.endPeriod || r.period || 'เต็มวัน',
-            approver: r.approver || '',
-            status: r.status || '',
-            fiscalYear: r.fiscalYear,
-            note: r.note || ''
-        })) : [];
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'backup_full_day_leave.json';
-        a.click();
-        URL.revokeObjectURL(a.href);
-    } catch (e) {
-        console.error('downloadNormalLeaveJSON error', e);
-        showErrorPopup('ไม่สามารถสร้างไฟล์ JSON การลาปกติได้');
-    }
-};
-
-
-// --- Enhancements: hide edit for approved, user history, pointer cursor ---
-
-// Wrap admin edit modal to hide edit controls if approved
-if (typeof window.openAdminEditModal === 'function') {
-  const _origOpen = window.openAdminEditModal;
-  window.openAdminEditModal = function(rec){
-    _origOpen(rec);
-    const approved = rec.confirmed === true || rec.status === "อนุมัติแล้ว";
-    if (approved) {
-      const modal = document.getElementById("admin-edit-modal");
-      if (modal){
-        const buttons = modal.querySelectorAll("button");
-        buttons.forEach(btn=>{
-          if(btn.textContent.includes("บันทึก")) btn.style.display="none";
-        });
-      }
-    }
-  }
-}
-
-// Show user hourly history via Swal
 window.showUserHourlyHistory = function(nick){
-  const list = (window.allHourlyRecords||[]).filter(r=>r.userNickname===nick);
+  const list = (allHourlyRecords||[]).filter(r=>r.userNickname===nick);
   let html="";
   list.forEach(r=>{
-    html+=`
-      <div class="border-b py-2">
-        <div><b>วันที่:</b> ${r.date}</div>
-        <div><b>เวลา:</b> ${r.startTime} - ${r.endTime}</div>
-        <div><b>ชั่วโมง:</b> ${r.duration}</div>
-        <div><b>หมายเหตุ:</b> ${r.note||"-"}</div>
-        <div><b>สถานะ:</b> ${r.confirmed ? "อนุมัติแล้ว" : "รออนุมัติ"}</div>
-      </div>`;
+    html += `<div class="border-b py-2">
+      <div><b>วันที่:</b> ${formatDateThaiShort(r.date)}</div>
+      <div><b>เวลา:</b> ${r.startTime}-${r.endTime}</div>
+      <div><b>ชั่วโมง:</b> ${formatHoursAndMinutes(r.duration)}</div>
+      <div><b>สถานะ:</b> ${r.confirmed?'อนุมัติแล้ว':'รออนุมัติ'}</div>
+      <div><b>หมายเหตุ:</b> ${r.note||'-'}</div>
+    </div>`;
   });
-  if(window.Swal){
-    Swal.fire({title:`ประวัติชั่วโมง (${nick})`, html:`<div style="text-align:left">${html}</div>`, width:500});
-  } else {
-    alert("ประวัติชั่วโมง:\n"+JSON.stringify(list,null,2));
-  }
+  Swal.fire({title:`ประวัติชั่วโมงของ ${nick}`, html:`<div style="text-align:left">${html}</div>`, width:500});
 };
+
+// hide edit in leave detail modal
+(function(){
+  const orig = window.showLeaveRecordDetailsModal;
+  window.showLeaveRecordDetailsModal = function(id){
+    orig(id);
+    const rec = allLeaveRecords.find(r=>r.id===id);
+    if(rec && rec.status==='อนุมัติแล้ว'){
+      const cancel = document.querySelector('.swal2-cancel');
+      if(cancel) cancel.style.display='none';
+    }
+  };
+})();
