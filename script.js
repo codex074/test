@@ -1084,7 +1084,7 @@ async function handleHourlySubmit(e) {
 
     
     // Validate time order: end > start
-    const startTimeVal = document.getElementById("hourly-start-time").value;getElementById('hourly-start').value;
+    const startTimeVal = document.getElementById('hourly-start').value;
     const endTimeVal   = document.getElementById('hourly-end').value;
     if (startTimeVal && endTimeVal && endTimeVal <= startTimeVal){
         return showErrorPopup('กรุณาเลือกเวลาสิ้นสุดหลังจากเวลาเริ่มต้น');
@@ -2007,145 +2007,168 @@ function renderHourlyRecords(records) {
 
 function renderLeaveSummary(summaryData) {
     const tbody = document.getElementById('leave-summary-table');
-    if(!tbody) return;
+    if (!tbody) return;
     tbody.innerHTML = '';
 
+    // --- Pagination Logic ---
     const totalRecords = summaryData.length;
-    const totalPages = Math.ceil(totalRecords / summaryRecordsPerPage) || 1;
+    const totalPages = Math.max(1, Math.ceil(totalRecords / summaryRecordsPerPage));
+    
+    // ป้องกันเลขหน้าเกินจำนวนจริง
     leaveSummaryCurrentPage = Math.max(1, Math.min(leaveSummaryCurrentPage, totalPages));
 
     const startIndex = (leaveSummaryCurrentPage - 1) * summaryRecordsPerPage;
     const paginatedData = summaryData.slice(startIndex, startIndex + summaryRecordsPerPage);
 
-    paginatedData.forEach((user) => {
-         tbody.innerHTML += `<tr class="border-b hover:bg-gray-50"><td class="px-4 py-3"><a href="#" onclick="event.preventDefault(); showLeaveDetailPopup('${user.nickname}')" class="text-purple-600 hover:underline">${user.fullname}</a></td><td class="px-4 py-3">${user.nickname}</td><td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(user.position)}">${user.position}</span></td><td class="px-4 py-3 font-semibold">${user.totalDays} วัน</td></tr>`;
-    });
+    // --- Rendering Rows ---
+    if (paginatedData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">ไม่พบข้อมูล</td></tr>`;
+    } else {
+        paginatedData.forEach((user) => {
+            // ป้องกัน XSS ด้วยการ Escape ข้อมูลก่อนแสดงผล
+            const safeFullname = escapeHtml(user.fullname);
+            const safeNickname = escapeHtml(user.nickname);
+            const safePosition = escapeHtml(user.position);
+            const posClass = getPositionBadgeClass(user.position);
+            const totalDays = user.totalDays || 0;
 
+            const rowHtml = `
+                <tr class="border-b hover:bg-gray-50 transition-colors duration-150">
+                    <td class="px-4 py-3">
+                        <a href="#" onclick="event.preventDefault(); showLeaveDetailPopup('${safeNickname}')" 
+                           class="text-purple-600 hover:text-purple-800 hover:underline font-medium flex items-center gap-2">
+                           ${safeFullname}
+                        </a>
+                    </td>
+                    <td class="px-4 py-3 text-gray-700">${safeNickname}</td>
+                    <td class="px-4 py-3">
+                        <span class="position-badge ${posClass}">${safePosition}</span>
+                    </td>
+                    <td class="px-4 py-3 font-semibold text-gray-800">${totalDays} วัน</td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', rowHtml);
+        });
+    }
+
+    // --- Update Controls ---
     const pageInfo = document.getElementById('summary-page-info');
     const prevBtn = document.getElementById('summary-prev-btn');
     const nextBtn = document.getElementById('summary-next-btn');
-    
-    if(pageInfo) pageInfo.textContent = `หน้า ${leaveSummaryCurrentPage} / ${totalPages}`;
-    if(prevBtn) prevBtn.disabled = leaveSummaryCurrentPage === 1;
-    if(nextBtn) nextBtn.disabled = leaveSummaryCurrentPage === totalPages;
-    window.showLeaveDetailPopup = function(nickname) {
-  const fyEl = document.getElementById('leave-filter-fiscal-year');
-  const fiscalYear = fyEl ? parseInt(fyEl.value) : getCurrentFiscalYear();
 
-  const user = users.find(u => u.nickname === nickname);
-  if (!user) return showErrorPopup('ไม่พบผู้ใช้');
-
-  const getTypeKey = (t='') => {
-    const s = String(t).trim();
-    if (/พักผ่อน/i.test(s)) return 'vacation';
-    if (/ป่วย/i.test(s))    return 'sick';
-    if (/คลอด/i.test(s))    return 'maternity';
-    return 'personal';
-  };
-
-  const totals = { vacation: 0, sick: 0, personal: 0, maternity: 0 };
-
-  const records = allLeaveRecords
-    .filter(r => r.userNickname === nickname && r.fiscalYear === fiscalYear && r.status === 'อนุมัติแล้ว')
-    .map(r => {
-      const sPeriod = r.startPeriod || r.period;
-      const ePeriod = r.endPeriod || r.period;
-      const days = calculateLeaveDays(r.startDate, r.endDate, sPeriod, ePeriod);
-      const key  = getTypeKey(r.leaveType);
-      totals[key] += days;
-      return { ...r, days, key };
-    })
-    .sort((a,b) => (b.createdDate?.toDate?.() || new Date(b.startDate)) - (a.createdDate?.toDate?.() || new Date(a.startDate)));
-
-  const card = (label, value, extra='') => `
-    <div class="rounded-xl shadow-md p-4 text-center text-gray-800 ${extra}">
-      <div class="text-sm mb-1">${label}</div>
-      <div class="text-3xl font-extrabold">${value}</div>
-      <div class="text-xs mt-1">วัน (อนุมัติ)</div>
-    </div>`;
-
-  const cardsHtml = `
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-      ${card('ลาพักผ่อน', totals.vacation, 'leave-card-vacation')}
-      ${card('ลาป่วย',     totals.sick,     'leave-card-sick')}
-      ${card('ลากิจ/ฉุกเฉิน', totals.personal, 'leave-card-personal')}
-      ${card('ลาคลอด',    totals.maternity,'leave-card-maternity')}
-    </div>
-  `;
-
-  // === Pagination ===
-  let currentPage = 1;
-  const perPage = 10;
-  const totalPages = Math.max(1, Math.ceil(records.length / perPage));
-
-  const renderTable = () => {
-    const start = (currentPage - 1) * perPage;
-    const pageRecords = records.slice(start, start + perPage);
-
-    const rows = pageRecords.map(r => {
-      const dateText = (r.startDate === r.endDate)
-        ? `${formatDateThaiShort(r.startDate)} (${r.startPeriod || r.period})`
-        : `${formatDateThaiShort(r.startDate)} (${r.startPeriod || r.period}) - ${formatDateThaiShort(r.endDate)} (${r.endPeriod || r.period})`;
-
-      const tagClass =
-        r.key === 'vacation'  ? 'modal-tag modal-tag-green'   :
-        r.key === 'sick'      ? 'modal-tag modal-tag-red'     :
-        r.key === 'maternity' ? 'modal-tag modal-tag-pink'    :
-                                'modal-tag modal-tag-purple';
-
-      return `
-        <tr class="border-b">
-          <td class="px-3 py-2"><span class="${tagClass}">${r.leaveType}</span></td>
-          <td class="px-3 py-2">${dateText}</td>
-          <td class="px-3 py-2 text-center font-semibold">${r.days}</td>
-          <td class="px-3 py-2">${r.approver || '-'}</td>
-        </tr>`;
-    }).join('') || `<tr><td colspan="4" class="px-3 py-6 text-center text-gray-500">ไม่มีข้อมูล</td></tr>`;
-
-    const pager = `
-      <div class="flex justify-between items-center mt-2">
-        <button class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300" ${currentPage===1?'disabled':''} onclick="document.querySelector('#leave-table-body').dispatchEvent(new CustomEvent('changePage',{detail:-1}))">ก่อนหน้า</button>
-        <div class="text-sm">หน้า ${currentPage} / ${totalPages}</div>
-        <button class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300" ${currentPage===totalPages?'disabled':''} onclick="document.querySelector('#leave-table-body').dispatchEvent(new CustomEvent('changePage',{detail:1}))">ถัดไป</button>
-      </div>`;
-
-    return `
-      <div class="bg-gray-50 border rounded-lg">
-        <div class="px-3 py-2 text-sm font-semibold text-gray-700">รายการวันลา</div>
-        <div class="overflow-x-auto">
-          <table class="min-w-full text-sm">
-            <thead class="bg-white sticky top-0">
-              <tr class="text-gray-600">
-                <th class="px-3 py-2 text-left">ประเภท</th>
-                <th class="px-3 py-2 text-left">ช่วงวัน/เวลา</th>
-                <th class="px-3 py-2 w-24">วันลา</th>
-                <th class="px-3 py-2">ผู้อนุมัติ</th>
-              </tr>
-            </thead>
-            <tbody id="leave-table-body">${rows}</tbody>
-          </table>
-        </div>
-        ${pager}
-      </div>`;
-  };
-
-  Swal.fire({
-    title: `สรุปวันลาของ ${user.fullname} (${user.nickname}) – ปีงบ ${fiscalYear}`,
-    html: cardsHtml + renderTable(),
-    width: Math.min(window.innerWidth - 32, 900),
-    confirmButtonText: 'ปิด',
-    didOpen: () => {
-      const body = document.getElementById('leave-table-body');
-      body.addEventListener('changePage', e => {
-        currentPage = Math.min(Math.max(1, currentPage + e.detail), totalPages);
-        Swal.update({ html: cardsHtml + renderTable() });
-      });
-    }
-  });
-};
-
+    if (pageInfo) pageInfo.textContent = `หน้า ${leaveSummaryCurrentPage} / ${totalPages}`;
+    if (prevBtn) prevBtn.disabled = leaveSummaryCurrentPage === 1;
+    if (nextBtn) nextBtn.disabled = leaveSummaryCurrentPage === totalPages;
 }
 
+// ==========================================
+// 2. ย้าย showLeaveDetailPopup ออกมาไว้ข้างนอก (Global Scope)
+// ==========================================
+window.showLeaveDetailPopup = function(nickname) {
+    const fyEl = document.getElementById('leave-filter-fiscal-year');
+    const fiscalYear = fyEl ? parseInt(fyEl.value) : getCurrentFiscalYear();
+
+    const user = users.find(u => u.nickname === nickname);
+    if (!user) return showErrorPopup('ไม่พบข้อมูลผู้ใช้');
+
+    // Helper จัดกลุ่มประเภทการลา
+    const getTypeKey = (t = '') => {
+        const s = String(t).trim();
+        if (/พักผ่อน/i.test(s)) return 'vacation';
+        if (/ป่วย/i.test(s)) return 'sick';
+        if (/คลอด/i.test(s)) return 'maternity';
+        return 'personal';
+    };
+
+    const totals = { vacation: 0, sick: 0, personal: 0, maternity: 0 };
+
+    // กรองข้อมูลและคำนวณยอดรวม
+    const records = allLeaveRecords
+        .filter(r => r.userNickname === nickname && parseInt(r.fiscalYear) === fiscalYear && r.status === 'อนุมัติแล้ว')
+        .map(r => {
+            const sPeriod = r.startPeriod || r.period;
+            const ePeriod = r.endPeriod || r.period;
+            const days = calculateLeaveDays(r.startDate, r.endDate, sPeriod, ePeriod);
+            const key = getTypeKey(r.leaveType);
+            totals[key] += days;
+            return { ...r, days, key };
+        })
+        .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+    // สร้าง HTML สำหรับการ์ดสรุปยอด
+    const card = (label, value, extraClass = '') => `
+        <div class="rounded-xl shadow-sm border border-gray-100 p-3 text-center ${extraClass}">
+          <div class="text-xs text-gray-600 mb-1">${label}</div>
+          <div class="text-2xl font-bold text-gray-800">${value}</div>
+        </div>`;
+
+    const cardsHtml = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          ${card('ลาพักผ่อน', totals.vacation, 'bg-green-50')}
+          ${card('ลาป่วย', totals.sick, 'bg-red-50')}
+          ${card('ลากิจ/ฉุกเฉิน', totals.personal, 'bg-purple-50')}
+          ${card('ลาคลอด', totals.maternity, 'bg-pink-50')}
+        </div>
+    `;
+
+    // สร้างตารางรายการลา (แบบง่าย ไม่ต้อง Pagination ซ้อนใน Modal เพื่อลดความซับซ้อน)
+    const rows = records.map(r => {
+        const dateText = (r.startDate === r.endDate)
+            ? `${formatDateThaiShort(r.startDate)} <span class="text-xs text-gray-500">(${r.startPeriod})</span>`
+            : `${formatDateThaiShort(r.startDate)} - ${formatDateThaiShort(r.endDate)}`;
+
+        let badgeClass = 'bg-gray-100 text-gray-600';
+        if(r.key === 'vacation') badgeClass = 'bg-green-100 text-green-700';
+        else if(r.key === 'sick') badgeClass = 'bg-red-100 text-red-700';
+        else if(r.key === 'maternity') badgeClass = 'bg-pink-100 text-pink-700';
+        else badgeClass = 'bg-purple-100 text-purple-700';
+
+        return `
+            <tr class="border-b last:border-0">
+                <td class="px-3 py-2 text-left"><span class="px-2 py-1 rounded text-xs font-semibold ${badgeClass}">${r.leaveType}</span></td>
+                <td class="px-3 py-2 text-left text-sm">${dateText}</td>
+                <td class="px-3 py-2 text-center font-bold text-gray-700">${r.days}</td>
+            </tr>`;
+    }).join('') || `<tr><td colspan="3" class="text-center py-4 text-gray-400">ไม่มีรายการลา</td></tr>`;
+
+    const tableHtml = `
+        <div class="overflow-hidden border rounded-lg">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="px-3 py-2 text-left">ประเภท</th>
+                        <th class="px-3 py-2 text-left">วัน/เวลา</th>
+                        <th class="px-3 py-2 text-center">วัน</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white">${rows}</tbody>
+            </table>
+        </div>
+    `;
+
+    Swal.fire({
+        title: `ประวัติการลา: ${user.nickname} (ปีงบ ${fiscalYear})`,
+        html: cardsHtml + `<div class="max-h-[300px] overflow-y-auto text-left">${tableHtml}</div>`,
+        width: 600,
+        confirmButtonText: 'ปิด',
+        customClass: {
+            popup: 'rounded-2xl'
+        }
+    });
+};
+
+// ==========================================
+// 3. Helper Function: Escape HTML (ถ้ายังไม่มีในไฟล์)
+// ==========================================
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
 function renderLeaveRecords(records) {
     const tbody = document.getElementById('leave-records-table');
     if(!tbody) return;
@@ -2950,7 +2973,7 @@ window.showMoreEventsModal = function(dateString) {
         confirmButtonText: 'ปิด',
         customClass: { htmlContainer: 'swal-left' } 
     });
-};;;
+};
 
 window.showLeaveDetailModal = function(id) {
     const record = allLeaveRecords.find(r => r.id === id);
