@@ -1605,13 +1605,3 @@ button[type="submit"]:active, .generic-button:active {
     color: #9ca3af;
     font-size: 0.875rem;
 }
-
-
-/* Numpad improved anti-zoom styles */
-.keypad-btn {
-    width: 90px !important;
-    height: 90px !important;
-    font-size: 24px !important;
-    border-radius: 50% !important;
-    touch-action: manipulation !important;
-}

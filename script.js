@@ -3510,31 +3510,3 @@ window.editHourlyRecord = async function(id) {
     showSuccessPopup('อัปเดตสำเร็จ');
     renderAdminDashboard();
 };
-
-
-// --- Enhanced Numpad Touch Handling ---
-document.addEventListener('DOMContentLoaded', () => {
-    const btns = document.querySelectorAll('.keypad-btn');
-    let lastTap = 0;
-
-    btns.forEach(btn => {
-        btn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const digit = btn.dataset.digit;
-            if (digit) addDigit(digit);
-
-            if (btn.dataset.action === 'delete') deleteDigit();
-            if (btn.dataset.action === 'cancel') Swal.close();
-        });
-
-        btn.addEventListener('touchend', (e) => {
-            const now = new Date().getTime();
-            if (now - lastTap < 300) e.preventDefault();
-            lastTap = now;
-        });
-
-        btn.addEventListener('click', (e) => {
-            if ('ontouchstart' in window) e.preventDefault();
-        });
-    });
-});
