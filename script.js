@@ -54,6 +54,67 @@ function isApproved(rec) {
 function getStatusClass(rec) { return isApproved(rec) ? 'approved' : 'pending'; }
 
 let users = [];
+
+// --- Helper: resolve display nickname to userNickname (stored in users array) ---
+function resolveUserNicknameFromDisplay(displayName) {
+    if (!displayName) return null;
+    const d = displayName.toString().trim();
+    const u = users.find(u => u.nickname === d || u.fullname === d);
+    return u ? u.nickname : null;
+}
+
+// --- Function: showPersonHourlyHistory(userNickname) ---
+window.showPersonHourlyHistory = function(userNickname) {
+    if (!userNickname) return showErrorPopup('ไม่พบข้อมูลผู้ใช้ที่ต้องการ');
+    const records = (allHourlyRecords || []).filter(r => r.userNickname === userNickname);
+    if (!records || records.length === 0) {
+        // try alternative match by nickname field if any record stored nickname differently
+        const alt = (allHourlyRecords || []).filter(r => (r.nickname || r.userNickname || '').toString() === userNickname);
+        if (!alt || alt.length === 0) {
+            const userObj = users.find(u => u.nickname === userNickname);
+            const display = userObj ? userObj.nickname : userNickname;
+            return Swal.fire('ไม่มีประวัติ', `ไม่พบข้อมูลของ ${display}`, 'info');
+        }
+    }
+    const sorted = records.slice().sort((a,b) => new Date(b.date || b.startDate) - new Date(a.date || a.startDate));
+    let html = '<div style="max-height:420px; overflow-y:auto; text-align:left;">';
+    sorted.forEach(r => {
+        html += `<div style="padding:10px;border-bottom:1px solid #eee;">
+            <div><strong>วันที่:</strong> ${formatDateThaiShort(r.date || r.startDate)}</div>
+            <div><strong>ประเภท:</strong> ${r.type === 'leave' ? 'ลาชั่วโมง' : (r.type === 'use' ? 'ใช้ชั่วโมง' : (r.hourlyType || r.type || '-'))}</div>
+            <div><strong>เวลา:</strong> ${r.startTime || r.start || '-'} - ${r.endTime || r.end || '-'}</div>
+            <div><strong>ผู้อนุมัติ:</strong> ${r.approver || r.approverName || '-'}</div>
+            <div><strong>หมายเหตุ:</strong> ${r.note || r.notes || '-'}</div>
+            <div><strong>สถานะ:</strong> ${ (r.confirmed || (r.status && /อนุมัติ/i.test(r.status))) ? '✔ อนุมัติแล้ว' : '⏳ รออนุมัติ' }</div>
+        </div>`;
+    });
+    html += '</div>';
+    const userObj = users.find(u => u.nickname === userNickname);
+    const title = userObj ? `${userObj.fullname} (${userObj.nickname})` : userNickname;
+    Swal.fire({ title: `ประวัติของ ${title}`, html: html, width: 700, confirmButtonText: 'ปิด' });
+};
+
+// Attach delegated click listener for hourly-summary-table to map display name -> userNickname
+document.addEventListener('DOMContentLoaded', function(){
+    const sumTable = document.getElementById('hourly-summary-table');
+    if (sumTable) {
+        sumTable.addEventListener('click', function(e){
+            const el = e.target.closest('.clickable-name');
+            if (!el) return;
+            const display = el.dataset.display || el.textContent;
+            const userNick = resolveUserNicknameFromDisplay(display);
+            if (userNick) {
+                showPersonHourlyHistory(userNick);
+            } else {
+                // try lookup by fullname
+                const byFull = users.find(u => u.fullname === display);
+                if (byFull) return showPersonHourlyHistory(byFull.nickname);
+                Swal.fire('ไม่มีประวัติ', `ไม่พบข้อมูลของ ${display}`, 'info');
+            }
+        });
+    }
+});
+
 let admins = [];
 let filteredUsers = [];
 let allHourlyRecords = [];
@@ -1820,6 +1881,7 @@ function renderUsersTable() {
     if (nextBtn) nextBtn.disabled = usersCurrentPage === totalPages || totalPages === 0;
 }
 
+
 function renderHourlySummary(summary) {
     const tbody = document.getElementById('hourly-summary-table');
     if(!tbody) return;
@@ -1833,8 +1895,19 @@ function renderHourlySummary(summary) {
     const paginatedData = summary.slice(startIndex, startIndex + summaryRecordsPerPage);
 
     paginatedData.forEach(item => {
-        const balance = item.balance;
-        tbody.innerHTML += `<tr class="border-b hover:bg-gray-50 clickable-hourly-row"><td class="px-4 py-3"><span class="clickable-name">${item.nickname}</span></td><td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(item.position)}">${item.position}</span></td><td class="px-4 py-3">${formatHoursAndMinutes(item.leaveHours)}</td><td class="px-4 py-3">${formatHoursAndMinutes(item.usedHours)}</td><td class="px-4 py-3 font-semibold ${balance < 0 ? 'text-red-500' : 'text-green-500'}">${formatHoursAndMinutes(Math.abs(balance))}</td><td class="px-4 py-3 font-semibold ${balance < 0 ? 'text-red-500' : 'text-green-500'}">${balance >= 0 ? 'OK' : 'ติดลบ'}</td></tr>`;
+        const leaveHours = item.leaveHours !== undefined ? item.leaveHours : (item['ชั่วโมงที่ลา (อนุมัติ)'] || 0);
+        const usedHours = item.usedHours !== undefined ? item.usedHours : (item['ชั่วโมงที่ใช้ (อนุมัติ)'] || 0);
+        const balance = (item.balance !== undefined) ? item.balance : (usedHours - leaveHours);
+        // item.nickname is the display nickname (ไทย). We keep it and add clickable span.
+        tbody.innerHTML += `
+            <tr class="border-b hover:bg-gray-50">
+                <td class="px-4 py-3"><span class="clickable-name" data-display="${item.nickname}">${item.nickname}</span></td>
+                <td class="px-4 py-3"><span class="position-badge">${item.position || 'N/A'}</span></td>
+                <td class="px-4 py-3 text-right">${formatHoursAndMinutes(leaveHours)}</td>
+                <td class="px-4 py-3 text-right">${formatHoursAndMinutes(usedHours)}</td>
+                <td class="px-4 py-3 text-right font-semibold">${formatHoursAndMinutes(balance)}</td>
+            </tr>
+        `;
     });
 
     const pageInfo = document.getElementById('hourly-summary-page-info');
@@ -1845,6 +1918,7 @@ function renderHourlySummary(summary) {
     if(prevBtn) prevBtn.disabled = hourlySummaryCurrentPage === 1;
     if(nextBtn) nextBtn.disabled = hourlySummaryCurrentPage === totalPages;
 }
+
 
 function renderRankings(summary) {
     const negativeDiv = document.getElementById('negative-ranking');
