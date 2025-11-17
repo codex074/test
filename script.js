@@ -3512,51 +3512,29 @@ window.editHourlyRecord = async function(id) {
 };
 
 
-// Backup JSON modal control
-window.openBackupMenu = function() {
-    document.getElementById("backup-modal").classList.remove("hidden");
-};
-window.closeBackupMenu = function() {
-    document.getElementById("backup-modal").classList.add("hidden");
-};
+// --- Enhanced Numpad Touch Handling ---
+document.addEventListener('DOMContentLoaded', () => {
+    const btns = document.querySelectorAll('.keypad-btn');
+    let lastTap = 0;
 
-// JSON download functions
-window.downloadHourlyJSON = function() {
-    const data = allHourlyRecords.map(r => ({
-        userNickname: r.userNickname,
-        type: r.type,
-        date: r.date,
-        startTime: r.startTime,
-        endTime: r.endTime,
-        duration: r.duration,
-        approver: r.approver || "",
-        confirmed: r.confirmed || false,
-        fiscalYear: r.fiscalYear,
-        note: r.note || ""
-    }));
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "backup_hourly_leave.json";
-    a.click();
-};
+    btns.forEach(btn => {
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const digit = btn.dataset.digit;
+            if (digit) addDigit(digit);
 
-window.downloadNormalLeaveJSON = function() {
-    const data = allLeaveRecords.map(r => ({
-        userNickname: r.userNickname,
-        leaveType: r.leaveType,
-        startDate: r.startDate,
-        endDate: r.endDate,
-        startPeriod: r.startPeriod,
-        endPeriod: r.endPeriod,
-        approver: r.approver,
-        status: r.status,
-        fiscalYear: r.fiscalYear,
-        note: r.note || ""
-    }));
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "backup_full_day_leave.json";
-    a.click();
-};
+            if (btn.dataset.action === 'delete') deleteDigit();
+            if (btn.dataset.action === 'cancel') Swal.close();
+        });
+
+        btn.addEventListener('touchend', (e) => {
+            const now = new Date().getTime();
+            if (now - lastTap < 300) e.preventDefault();
+            lastTap = now;
+        });
+
+        btn.addEventListener('click', (e) => {
+            if ('ontouchstart' in window) e.preventDefault();
+        });
+    });
+});
