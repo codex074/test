@@ -3770,3 +3770,143 @@ document.addEventListener('DOMContentLoaded', function(){
         });
     }
 });
+
+
+// ---- appended overrides (2025-11-17T15:11:23.765640Z) ----
+
+
+/* --- OVERRIDE: Reliable renderHourlySummary and renderHourlyRecords to ensure clickable names --- */
+function renderHourlySummary(summary) {
+    const tbody = document.getElementById('hourly-summary-table');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+
+    const totalRecords = summary.length;
+    const totalPages = Math.max(1, Math.ceil(totalRecords / summaryRecordsPerPage));
+    hourlySummaryCurrentPage = Math.max(1, Math.min(hourlySummaryCurrentPage, totalPages));
+
+    const startIndex = (hourlySummaryCurrentPage - 1) * summaryRecordsPerPage;
+    const paginatedData = summary.slice(startIndex, startIndex + summaryRecordsPerPage);
+
+    paginatedData.forEach(item => {
+        const leaveHours = Number(item.leaveHours) || 0;
+        const usedHours = Number(item.usedHours) || 0;
+        const balance = Number(item.balance) || (usedHours - leaveHours);
+        const userKey = item.userNickname || item.nickname || '';
+        const displayName = item.nickname || userKey || '';
+
+        tbody.insertAdjacentHTML('beforeend', `
+            <tr class="border-b hover:bg-gray-50">
+                <td class="px-4 py-3">
+                    <span class="clickable-name" data-user="${escapeHtml(userKey)}" data-display="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span>
+                </td>
+                <td class="px-4 py-3"><span class="position-badge">${escapeHtml(item.position || 'N/A')}</span></td>
+                <td class="px-4 py-3 text-right">${formatHoursAndMinutes(leaveHours)}</td>
+                <td class="px-4 py-3 text-right">${formatHoursAndMinutes(usedHours)}</td>
+                <td class="px-4 py-3 text-right font-semibold">${formatHoursAndMinutes(balance)}</td>
+            </tr>
+        `);
+    });
+
+    const pageInfo = document.getElementById('hourly-summary-page-info');
+    const prevBtn = document.getElementById('hourly-summary-prev-btn');
+    const nextBtn = document.getElementById('hourly-summary-next-btn');
+
+    if(pageInfo) pageInfo.textContent = `หน้า ${hourlySummaryCurrentPage} / ${totalPages}`;
+    if(prevBtn) prevBtn.disabled = hourlySummaryCurrentPage === 1;
+    if(nextBtn) nextBtn.disabled = hourlySummaryCurrentPage === totalPages;
+}
+
+/* Helper to sanitize text inserted into HTML */
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+}
+
+/* Override renderHourlyRecords to include clickable name and data-id on rows */
+function renderHourlyRecords(records) {
+    const tbody = document.getElementById('hourly-records-table');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+
+    const totalRecords = records.length;
+    const totalPages = Math.max(1, Math.ceil(totalRecords / recordsPerPage));
+    hourlyRecordsCurrentPage = Math.max(1, Math.min(hourlyRecordsCurrentPage, totalPages));
+
+    const startIndex = (hourlyRecordsCurrentPage - 1) * recordsPerPage;
+    const paginatedRecords = (records || []).slice().sort((a,b) => {
+        // try to compare date strings or timestamps
+        const at = a.timestamp ? (a.timestamp.seconds || a.timestamp) : 0;
+        const bt = b.timestamp ? (b.timestamp.seconds || b.timestamp) : 0;
+        return bt - at;
+    }).slice(startIndex, startIndex + recordsPerPage);
+
+    paginatedRecords.forEach(r => {
+        const user = users.find(u => u.nickname === r.userNickname) || {};
+        const statusText = r.confirmed ? 'อนุมัติแล้ว' : 'รออนุมัติ';
+        const statusClass = r.confirmed ? 'text-green-500' : 'text-yellow-500';
+        const displayName = user.nickname || r.userNickname || '';
+        const posClass = getPositionBadgeClass(user.position);
+        const typeLabel = r.type === 'leave' ? 'ลา' : 'ใช้';
+        const durationStr = formatHoursAndMinutes(r.duration || 0);
+        const dateStr = formatDateThaiShort(r.date || r.startDate || '');
+
+        tbody.insertAdjacentHTML('beforeend', `
+            <tr class="border-b hover:bg-gray-50 clickable-hourly-row" data-id="${escapeHtml(r.id || r._id || '')}">
+                <td class="px-4 py-3">${escapeHtml(dateStr)}</td>
+                <td class="px-4 py-3"><span class="clickable-name" data-user="${escapeHtml(r.userNickname || user.nickname || '')}">${escapeHtml(displayName)}</span></td>
+                <td class="px-4 py-3"><span class="position-badge ${posClass}">${escapeHtml(user.position || 'N/A')}</span></td>
+                <td class="px-4 py-3 font-semibold ${r.type === 'leave' ? 'hourly-text-red' : 'hourly-text-green'}">${escapeHtml(typeLabel)}</td>
+                <td class="px-4 py-3">${escapeHtml(r.startTime || r.start || '')}-${escapeHtml(r.endTime || r.end || '')} <span class="font-semibold ${r.type === 'leave' ? 'hourly-text-red' : 'hourly-text-green'}">(${escapeHtml(durationStr)})</span></td>
+                <td class="px-4 py-3">${escapeHtml(r.approver || '-')}</td>
+                <td class="px-4 py-3 font-semibold ${statusClass}">${escapeHtml(statusText)}</td>
+                <td class="px-4 py-3 flex items-center space-x-1">
+                    <button class="p-2 rounded-full hover:bg-red-100 text-red-600" title="ลบ" onclick="event.stopPropagation(); manageRecord('deleteHourly', '${escapeHtml(r.id || r._id || '')}')">
+                        <!-- trash icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                    </button>
+                </td>
+            </tr>
+        `);
+    });
+
+    const pageInfo = document.getElementById('hourly-page-info');
+    const prevBtn = document.getElementById('hourly-prev-btn');
+    const nextBtn = document.getElementById('hourly-next-btn');
+
+    if(pageInfo) pageInfo.textContent = `หน้า ${hourlyRecordsCurrentPage} / ${totalPages || 1}`;
+    if(prevBtn) prevBtn.disabled = hourlyRecordsCurrentPage === 1;
+    if(nextBtn) nextBtn.disabled = hourlyRecordsCurrentPage === totalPages || totalPages === 0;
+}
+
+/* Ensure delegated click handlers exist (idempotent) */
+(function ensureDelegatedClickHandlers(){
+    document.addEventListener('click', function(e){
+        // clickable-name span in summary/records
+        const nameEl = e.target.closest && e.target.closest('.clickable-name');
+        if(nameEl){
+            const user = nameEl.dataset && nameEl.dataset.user;
+            if(user) {
+                // call history viewer
+                try { showPersonHourlyHistory(user); } catch (err) { console.error('showPersonHourlyHistory error', err); }
+                e.preventDefault();
+                return;
+            }
+        }
+        // clickable row for records: open detail modal
+        const row = e.target.closest && e.target.closest('.clickable-hourly-row');
+        if(row && !e.target.closest('button')){
+            const id = row.dataset && row.dataset.id;
+            if(id){
+                try { if(typeof showHourlyDetailModal === 'function') showHourlyDetailModal(id); else if(typeof showHourlyRecordDetails === 'function') showHourlyRecordDetails(id); } catch(err){ console.error('showHourlyDetailModal error', err); }
+                e.preventDefault();
+                return;
+            }
+        }
+    }, true);
+})();
