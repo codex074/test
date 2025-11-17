@@ -3574,49 +3574,28 @@ window.downloadNormalLeaveJSON = function() {
     }
 };
 
-
-/* === Added: Summary click to show history === */
-document.addEventListener("click", (e) => {
-    if (e.target.classList.contains("summary-name")) {
-        const nickname = e.target.dataset.name;
-        openUserHourlyHistory(nickname);
-    }
+// === Added enhancements ===
+document.addEventListener('DOMContentLoaded', ()=>{
+  const tbl = document.getElementById('hourly-summary-table');
+  if(tbl){
+    tbl.addEventListener('click', (e)=>{
+      const cell = e.target.closest('td');
+      if(!cell) return;
+      const idx = Array.from(cell.parentNode.children).indexOf(cell);
+      if(idx===0){ // first column = nickname
+        const name = cell.textContent.trim();
+        if(name) showPersonHourlyHistory(name);
+      }
+    });
+  }
 });
 
-function openUserHourlyHistory(nickname) {
-    const records = (window.allHourlyRecords || []).filter(r => r.user === nickname);
-
-    let html = `
-        <div class='text-left'>
-            <h2 class='text-xl font-bold mb-3'>ประวัติรายการของ ${nickname}</h2>
-            <div class='max-h-96 overflow-y-auto border rounded-lg p-3 bg-gray-50'>
-    `;
-
-    records.forEach(r => {
-        html += `
-            <div class='p-2 border-b'>
-                <div><b>วันที่:</b> ${r.date || ""}</div>
-                <div><b>ประเภท:</b> ${r.type === 'leave' ? 'ลาชั่วโมง' : 'ใช้ชั่วโมง'}</div>
-                <div><b>เวลา:</b> ${r.start || ""} - ${r.end || ""}</div>
-                <div><b>ผู้อนุมัติ:</b> ${r.approver || ""}</div>
-                <div><b>สถานะ:</b> ${(r.confirmed ? 'อนุมัติ' : 'รออนุมัติ')}</div>
-            </div>
-        `;
-    });
-
-    html += `</div></div>`;
-
-    Swal.fire({
-        html,
-        width: "600px",
-        confirmButtonText: "ปิด"
-    });
-}
-
-/* Hide edit button for approved records (if modal uses this element id) */
-window.hideEditIfApproved = function(record){
-    const btn = document.getElementById("edit-hourly-btn");
-    if (!btn) return;
-    if (record && (record.confirmed === true)) btn.style.display = "none";
-    else btn.style.display = "inline-flex";
+window.showPersonHourlyHistory = function(nickname){
+  const records = (window.allHourlyRecords||[]).filter(r=>r.nickname===nickname);
+  let html = '<div>';
+  records.forEach(r=>{
+    html += `<div><b>วันที่:</b> ${r.date}<br><b>ประเภท:</b> ${r.type}</div><hr>`;
+  });
+  html+='</div>';
+  Swal.fire({title:`ประวัติของ ${nickname}`, html});
 };

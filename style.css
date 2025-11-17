@@ -1606,7 +1606,10 @@ button[type="submit"]:active, .generic-button:active {
     font-size: 0.875rem;
 }
 
-
-/* Added interactivity for clickable names */
-.cursor-pointer { cursor: pointer; }
-.summary-name:hover { color: #7c3aed !important; text-decoration: underline; }
+/* clickable nickname */
+.clickable-name, #hourly-summary-table td:first-child {
+  cursor: pointer;
+  color: #4f46e5;
+  font-weight: 600;
+}
+#hourly-summary-table td:first-child:hover { text-decoration: underline; }
