@@ -3576,48 +3576,123 @@ window.downloadNormalLeaveJSON = function() {
 
 
 
-/* === Added Enhancements (final integration) === */
+/* === Robust UI handlers added by assistant === */
 
-// Replace summary nickname with clickable
+/**
+ * Show person's hourly history in a modal.
+ * Looks for fields: date, hourlyType, startTime, endTime, approver, note, confirmed
+ */
 window.showPersonHourlyHistory = function(nickname) {
-    const records = (window.allHourlyRecords || [])
-        .filter(r => r.nickname === nickname)
-        .sort((a,b)=> new Date(b.date) - new Date(a.date));
-    if(records.length===0){
-        Swal.fire("ไม่มีประวัติ", `ไม่พบข้อมูลของ ${nickname}`, "info");
+    const records = (window.allHourlyRecords || []).filter(r => (r.nickname || '').toString() === nickname);
+    if (!records || records.length === 0) {
+        Swal.fire('ไม่มีประวัติ', `ไม่พบข้อมูลของ ${nickname}`, 'info');
         return;
     }
-    let html = `<div style="max-height:450px;overflow-y:auto;text-align:left;padding:10px;">`;
-    records.forEach(r=>{
-        html += `
-        <div class="border-b py-2">
-            <div><b>วันที่:</b> ${r.date}</div>
-            <div><b>ประเภท:</b> ${r.hourlyType === "leave" ? "ลาชั่วโมง" : "ใช้ชั่วโมง"}</div>
-            <div><b>เวลา:</b> ${r.startTime} - ${r.endTime}</div>
-            <div><b>ผู้อนุมัติ:</b> ${r.approver || "-"}</div>
-            <div><b>หมายเหตุ:</b> ${r.note || "-"}</div>
-            <div><b>สถานะ:</b> ${r.confirmed ? "✔ อนุมัติแล้ว" : "⏳ รออนุมัติ"}</div>
+    const sorted = records.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+    let html = '<div style="max-height:420px; overflow-y:auto; text-align:left;">';
+    sorted.forEach(r=>{
+        html += `<div style="padding:10px;border-bottom:1px solid #eee;">
+            <div><strong>วันที่:</strong> ${r.date || r.startDate || '-'}</div>
+            <div><strong>ประเภท:</strong> ${ (r.hourlyType === 'leave' || r.type === 'leave') ? 'ลาชั่วโมง' : (r.hourlyType === 'use' || r.type === 'use' ? 'ใช้ชั่วโมง' : (r.type || r.hourlyType || '-')) }</div>
+            <div><strong>เวลา:</strong> ${r.startTime || r.start || '-'} - ${r.endTime || r.end || '-'}</div>
+            <div><strong>ผู้อนุมัติ:</strong> ${r.approver || r.approverName || r.approverUser || '-'}</div>
+            <div><strong>หมายเหตุ:</strong> ${r.note || r.notes || '-'}</div>
+            <div><strong>สถานะ:</strong> ${ (r.confirmed || r.status && /อนุมัติ/i.test(r.status)) ? '✔ อนุมัติแล้ว' : '⏳ รออนุมัติ' }</div>
         </div>`;
     });
-    html += `</div>`;
-    Swal.fire({title:`ประวัติของ ${nickname}`, html, width:600});
+    html += '</div>';
+    Swal.fire({ title: `ประวัติของ ${nickname}`, html, width: 650, confirmButtonText: 'ปิด' });
 };
 
-// Remove edit button on approved record inside modal
-window.buildHourlyEditButtons = function(rec){
-    if(rec.confirmed) return "";
-    return `<button onclick="saveHourlyEdit('${rec.id}')" class="bg-blue-600 text-white px-4 py-2 rounded-lg">บันทึก</button>`;
+// Show a single hourly record's details (uses record object or id)
+window.showHourlyRecordDetails = function(recOrId){
+    const all = window.allHourlyRecords || [];
+    let rec = null;
+    if(!recOrId) return;
+    if(typeof recOrId === 'string') {
+        // try find by id
+        rec = all.find(r => r.id === recOrId);
+    } else if (typeof recOrId === 'object') rec = recOrId;
+    if(!rec) {
+        // try find by matching nickname+date from a string like "name|date"
+        // or fallback to searching by nickname and date in DOM context - skip
+        Swal.fire('ไม่พบข้อมูล', 'ไม่สามารถค้นหารายการนี้ได้', 'error');
+        return;
+    }
+    const html = `<div style="text-align:left">
+        <div><strong>วันที่:</strong> ${rec.date || rec.startDate || '-'}</div>
+        <div><strong>ประเภท:</strong> ${ (rec.hourlyType === 'leave' || rec.type === 'leave') ? 'ลาชั่วโมง' : 'ใช้ชั่วโมง' }</div>
+        <div><strong>เวลา:</strong> ${rec.startTime || rec.start || '-'} - ${rec.endTime || rec.end || '-'}</div>
+        <div><strong>ผู้อนุมัติ:</strong> ${rec.approver || '-'}</div>
+        <div><strong>หมายเหตุ:</strong> ${rec.note || '-'}</div>
+        <div><strong>สถานะ:</strong> ${ rec.confirmed ? '✔ อนุมัติแล้ว' : '⏳ รออนุมัติ' }</div>
+    </div>`;
+    const showEditButton = !(rec.confirmed);
+    Swal.fire({
+        title: 'รายละเอียดรายการ',
+        html: html,
+        showCancelButton: !!showEditButton,
+        confirmButtonText: 'ปิด',
+        cancelButtonText: showEditButton ? 'แก้ไข' : undefined,
+        didOpen: () => {},
+        preConfirm: () => {}
+    }).then(result=>{
+        if(result.dismiss === Swal.DismissReason.cancel){
+            // if there's an edit flow in original code, call it
+            if(typeof window.openEditModal === 'function') {
+                window.openEditModal(rec.id);
+            } else if (typeof window.openHourlyEditModal === 'function') {
+                window.openHourlyEditModal(rec.id);
+            } else {
+                Swal.fire('แก้ไข', 'ฟังก์ชันแก้ไขไม่พร้อมใช้งาน', 'info');
+            }
+        }
+    });
 };
 
-// Make hourly rows clickable
-document.addEventListener("DOMContentLoaded", ()=>{
-    const tbl = document.getElementById("hourly-records-table");
-    if(tbl){
-        tbl.addEventListener("click",(e)=>{
-            const tr = e.target.closest("tr");
+// Delegated click handling for summary and records tables
+document.addEventListener('DOMContentLoaded', function(){
+    // Summary table: click on first column -> show history
+    const sumTable = document.getElementById('hourly-summary-table');
+    if(sumTable){
+        sumTable.addEventListener('click', function(e){
+            const td = e.target.closest('td');
+            if(!td) return;
+            // assume first column is nickname
+            const tr = td.parentElement;
+            const tds = Array.from(tr.children);
+            const nickname = (tds[1] ? tds[1].textContent : td.textContent).trim() || td.textContent.trim(); // sometimes 2nd column
+            if(nickname) showPersonHourlyHistory(nickname);
+        });
+    }
+
+    // Records table: clicking a row will open details modal (try to resolve record)
+    const recTable = document.getElementById('hourly-records-table');
+    if(recTable){
+        recTable.addEventListener('click', function(e){
+            const tr = e.target.closest('tr');
             if(!tr) return;
-            const id = tr.dataset.id;
-            if(id) openHourlyDetailsModal(id);
+            // try dataset.id
+            const did = tr.dataset && tr.dataset.id;
+            if(did){
+                showHourlyRecordDetails(did);
+                return;
+            }
+            // else try to read date and nickname cells (assume columns: date, nickname, ...)
+            const tds = Array.from(tr.children);
+            const dateText = tds[0] ? tds[0].textContent.trim() : '';
+            const nickname = tds[1] ? tds[1].textContent.trim() : '';
+            if(nickname){
+                const match = (window.allHourlyRecords || []).find(r=>{
+                    const a = (r.nickname||'').toString().trim();
+                    const b = (r.date||r.startDate||'').toString().trim();
+                    // compare nickname exactly and date includes dateText or vice versa
+                    return a===nickname && (b.indexOf(dateText)!==-1 || dateText.indexOf(b)!==-1 || b===dateText);
+                });
+                if(match) { showHourlyRecordDetails(match); return; }
+                // fallback: show history
+                showPersonHourlyHistory(nickname);
+            }
         });
     }
 });

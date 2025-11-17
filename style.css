@@ -1607,19 +1607,8 @@ button[type="submit"]:active, .generic-button:active {
 }
 
 
-/* === Clickable Hourly Rows === */
-.clickable-hourly-row {
-    cursor: pointer;
-}
-.clickable-hourly-row:hover {
-    background-color: #f3f4f6;
-}
-/* clickable name */
-.clickable-name {
-    cursor: pointer;
-    color: #4f46e5;
-    font-weight: 600;
-}
-.clickable-name:hover {
-    text-decoration: underline;
-}
+/* Added for clickable rows/names */
+.clickable-hourly-row { cursor: pointer; }
+.clickable-hourly-row:hover { background-color: #f3f4f6; }
+.clickable-name { cursor: pointer; color: #4f46e5; font-weight:600; }
+.clickable-name:hover { text-decoration: underline; }
