@@ -1819,12 +1819,12 @@ function renderUsersTable() {
     if (prevBtn) prevBtn.disabled = usersCurrentPage === 1;
     if (nextBtn) nextBtn.disabled = usersCurrentPage === totalPages || totalPages === 0;
 }
-
 function renderHourlySummary(summary) {
     const tbody = document.getElementById('hourly-summary-table');
     if(!tbody) return;
     tbody.innerHTML = '';
 
+    // --- Pagination Setup ---
     const totalRecords = summary.length;
     const totalPages = Math.ceil(totalRecords / summaryRecordsPerPage) || 1;
     hourlySummaryCurrentPage = Math.max(1, Math.min(hourlySummaryCurrentPage, totalPages));
@@ -1832,11 +1832,47 @@ function renderHourlySummary(summary) {
     const startIndex = (hourlySummaryCurrentPage - 1) * summaryRecordsPerPage;
     const paginatedData = summary.slice(startIndex, startIndex + summaryRecordsPerPage);
 
+    // --- Render Rows ---
     paginatedData.forEach(item => {
         const balance = item.balance;
-        tbody.innerHTML += `<tr class="border-b hover:bg-gray-50"><td class="px-4 py-3">${item.nickname}</td><td class="px-4 py-3"><span class="position-badge ${getPositionBadgeClass(item.position)}">${item.position}</span></td><td class="px-4 py-3">${formatHoursAndMinutes(item.leaveHours)}</td><td class="px-4 py-3">${formatHoursAndMinutes(item.usedHours)}</td><td class="px-4 py-3 font-semibold ${balance < 0 ? 'text-red-500' : 'text-green-500'}">${formatHoursAndMinutes(Math.abs(balance))}</td><td class="px-4 py-3 font-semibold ${balance < 0 ? 'text-red-500' : 'text-green-500'}">${balance >= 0 ? 'OK' : 'ติดลบ'}</td></tr>`;
+        
+        // กำหนดสีตามค่าบวก/ลบ
+        const balanceClass = balance < 0 ? 'text-red-600' : 'text-green-600';
+        const statusBadge = balance < 0 
+            ? '<span class="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">ติดลบ</span>'
+            : '<span class="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">ปกติ</span>';
+
+        tbody.innerHTML += `
+        <tr class="border-b hover:bg-blue-50 transition-colors duration-150 group">
+            <td class="px-4 py-3">
+                <a href="#" onclick="event.preventDefault(); showHourlyHistoryModal('${item.nickname}')" 
+                   class="flex items-center gap-2 text-blue-600 font-bold hover:text-blue-800 hover:underline decoration-blue-400 underline-offset-2 transition-all">
+                    ${item.nickname}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                </a>
+            </td>
+            <td class="px-4 py-3">
+                <span class="position-badge ${getPositionBadgeClass(item.position)}">${item.position}</span>
+            </td>
+            <td class="px-4 py-3 text-gray-600 font-medium">
+                ${formatHoursAndMinutes(item.leaveHours)}
+            </td>
+            <td class="px-4 py-3 text-gray-600 font-medium">
+                ${formatHoursAndMinutes(item.usedHours)}
+            </td>
+            <td class="px-4 py-3 font-bold ${balanceClass}">
+                ${formatHoursAndMinutes(Math.abs(balance))}
+            </td>
+            <td class="px-4 py-3">
+                ${statusBadge}
+            </td>
+        </tr>`;
     });
 
+    // --- Update Pagination Controls ---
     const pageInfo = document.getElementById('hourly-summary-page-info');
     const prevBtn = document.getElementById('hourly-summary-prev-btn');
     const nextBtn = document.getElementById('hourly-summary-next-btn');
@@ -1845,7 +1881,140 @@ function renderHourlySummary(summary) {
     if(prevBtn) prevBtn.disabled = hourlySummaryCurrentPage === 1;
     if(nextBtn) nextBtn.disabled = hourlySummaryCurrentPage === totalPages;
 }
+window.showHourlyHistoryModal = function(nickname) {
+    // 1. ดึงปีงบประมาณและข้อมูลผู้ใช้
+    const fyEl = document.getElementById('hourly-filter-fiscal-year');
+    const fiscalYear = fyEl ? parseInt(fyEl.value) : getCurrentFiscalYear();
+    const user = users.find(u => u.nickname === nickname);
 
+    if (!user) return showErrorPopup('ไม่พบข้อมูลผู้ใช้');
+
+    // 2. ดึงข้อมูลและเรียงลำดับ (เฉพาะที่อนุมัติแล้ว)
+    const records = allHourlyRecords.filter(r => 
+        r.userNickname === nickname && 
+        r.fiscalYear === fiscalYear && 
+        r.confirmed
+    ).sort((a, b) => {
+        // เรียงวันที่ล่าสุดขึ้นก่อน, ถ้าวันเท่ากันเอาเวลาล่าสุดขึ้น
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+        return b.startTime.localeCompare(a.startTime);
+    });
+
+    // 3. คำนวณยอดรวม
+    let totalLeave = 0;
+    let totalUse = 0;
+    records.forEach(r => {
+        if (r.type === 'leave') totalLeave += r.duration;
+        else if (r.type === 'use') totalUse += r.duration;
+    });
+    const balance = totalUse - totalLeave;
+
+    // 4. สร้าง HTML ส่วน Card สรุปยอด (ส่วนบน)
+    const cardHtml = (label, value, colorClass, bgClass) => `
+        <div class="flex flex-col items-center justify-center p-3 rounded-xl border ${bgClass} ${colorClass}">
+            <span class="text-xs font-semibold opacity-80 mb-1">${label}</span>
+            <span class="text-xl font-bold">${formatHoursAndMinutes(Math.abs(value))}</span>
+        </div>`;
+
+    const headerHtml = `
+        <div class="grid grid-cols-3 gap-3 mb-4">
+            ${cardHtml('ใช้ชั่วโมง', totalUse, 'text-blue-700 border-blue-200', 'bg-blue-50')}
+            ${cardHtml('ลาชั่วโมง', totalLeave, 'text-red-700 border-red-200', 'bg-red-50')}
+            ${cardHtml(balance >= 0 ? 'คงเหลือ' : 'ติดลบ', balance, balance >= 0 ? 'text-green-700 border-green-200 bg-green-50' : 'text-red-700 border-red-200 bg-red-50')}
+        </div>
+        <div id="modal-table-container" class="min-h-[300px]"></div>
+        <div id="modal-pagination-controls" class="flex justify-between items-center mt-4 pt-3 border-t"></div>
+    `;
+
+    // 5. แสดงผลด้วย SweetAlert
+    Swal.fire({
+        title: `ประวัติ: ${user.nickname} (${user.fullname})`,
+        html: headerHtml,
+        width: '600px',
+        showConfirmButton: true,
+        confirmButtonText: 'ปิดหน้าต่าง',
+        customClass: {
+            popup: 'rounded-2xl',
+            title: 'text-xl text-gray-800 font-bold mb-2',
+            confirmButton: 'bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg'
+        },
+        didOpen: () => {
+            // --- Logic การแสดงตารางและแบ่งหน้า (ทำงานหลัง Modal เปิด) ---
+            let currentPage = 1;
+            const perPage = 5; // จำนวนรายการต่อหน้า
+            const totalPages = Math.ceil(records.length / perPage) || 1;
+
+            const renderPage = () => {
+                const start = (currentPage - 1) * perPage;
+                const pageData = records.slice(start, start + perPage);
+                const container = document.getElementById('modal-table-container');
+                const controls = document.getElementById('modal-pagination-controls');
+
+                // สร้าง HTML ตาราง
+                let tableHtml = `
+                    <div class="overflow-hidden rounded-lg border border-gray-200">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-100 text-gray-600 font-medium">
+                                <tr>
+                                    <th class="px-3 py-2 text-left">วันที่/เวลา</th>
+                                    <th class="px-3 py-2 text-center">ประเภท</th>
+                                    <th class="px-3 py-2 text-right">จำนวน</th>
+                                    <th class="px-3 py-2 text-center">ผู้อนุมัติ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">`;
+
+                if (pageData.length === 0) {
+                    tableHtml += `<tr><td colspan="4" class="py-8 text-center text-gray-400">ไม่พบประวัติรายการ</td></tr>`;
+                } else {
+                    pageData.forEach(r => {
+                        const isLeave = r.type === 'leave';
+                        const badge = isLeave 
+                            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 border border-red-200">ลา</span>`
+                            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-600 border border-blue-200">ใช้</span>`;
+                        
+                        tableHtml += `
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-3 py-2 text-left">
+                                    <div class="font-semibold text-gray-700">${formatDateThaiShort(r.date)}</div>
+                                    <div class="text-xs text-gray-400">${r.startTime} - ${r.endTime}</div>
+                                </td>
+                                <td class="px-3 py-2 text-center">${badge}</td>
+                                <td class="px-3 py-2 text-right font-mono ${isLeave ? 'text-red-500' : 'text-blue-500'}">
+                                    ${isLeave ? '-' : '+'}${formatHoursAndMinutes(r.duration)}
+                                </td>
+                                <td class="px-3 py-2 text-center text-xs text-gray-500">${r.approver || '-'}</td>
+                            </tr>`;
+                    });
+                }
+                tableHtml += `</tbody></table></div>`;
+                container.innerHTML = tableHtml;
+
+                // สร้างปุ่ม Pagination
+                controls.innerHTML = `
+                    <button id="modal-prev" class="px-3 py-1 rounded-md bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm" ${currentPage === 1 ? 'disabled' : ''}>
+                        &larr; ก่อนหน้า
+                    </button>
+                    <span class="text-xs text-gray-500 font-medium">หน้า ${currentPage} / ${totalPages}</span>
+                    <button id="modal-next" class="px-3 py-1 rounded-md bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm" ${currentPage === totalPages ? 'disabled' : ''}>
+                        ถัดไป &rarr;
+                    </button>
+                `;
+
+                // ผูก Event Listener ให้ปุ่ม (ทำใหม่ทุกครั้งที่ Render)
+                document.getElementById('modal-prev').onclick = () => {
+                    if (currentPage > 1) { currentPage--; renderPage(); }
+                };
+                document.getElementById('modal-next').onclick = () => {
+                    if (currentPage < totalPages) { currentPage++; renderPage(); }
+                };
+            };
+
+            // เริ่ม Render หน้าแรก
+            renderPage();
+        }
+    });
+}
 function renderRankings(summary) {
     const negativeDiv = document.getElementById('negative-ranking');
     const positiveDiv = document.getElementById('positive-ranking');
