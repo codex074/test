@@ -58,15 +58,15 @@
             <button onclick="showTab('pin')" class="menu-item menu-item-yellow w-full text-left bg-white rounded-xl p-4 shadow-md" id="pin-tab">
                 <div class="flex items-center"><div class="text-3xl mr-4">🔑</div><div><h3 class="text-lg font-semibold text-gray-800">จัดการ PIN</h3><p class="text-sm text-gray-600">ตั้งค่ารหัส PIN </p></div></div>
             </button>
-            <button onclick="openBackupMenu()" class="menu-item menu-item-green w-full text-left bg-white rounded-xl p-4 shadow-md">
-    <div class="flex items-center">
-        <div class="text-3xl mr-4">💾</div>
-        <div>
-            <h3 class="text-lg font-semibold text-gray-800">Backup ข้อมูล</h3>
-            <p class="text-sm text-gray-600">Excel / JSON</p>
-        </div>
-    </div>
-</button>
+            <button id="export-btn" class="menu-item menu-item-green w-full text-left bg-white rounded-xl p-4 shadow-md">
+                <div class="flex items-center">
+                    <div class="text-3xl mr-4">💾</div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Backup ข้อมูล</h3>
+                        <p class="text-sm text-gray-600">ส่งออกข้อมูลเป็นไฟล์ Excel</p>
+                    </div>
+                </div>
+            </button>
             <button onclick="showTab('admin-dashboard')" class="menu-item menu-item-gray w-full text-left bg-white rounded-xl p-4 shadow-md" id="admin-dashboard-tab">
                 <div class="flex items-center">
                     <div class="text-3xl mr-4">👑</div>
@@ -291,21 +291,30 @@
                     </div>
                     
                     <div class="flex flex-wrap items-center gap-4 mb-4 pb-4 border-b">
-                        <span class="font-semibold text-gray-700">ตัวกรอง:</span>
-                        <button onclick="toggleCalendarFilter('fullDay', this)" class="calendar-view-btn filter-btn-fullday active">
-                            ลาในระบบ
-                        </button>
-                        <button onclick="toggleCalendarFilter('hourly', this)" class="calendar-view-btn filter-btn-hourly active">
-                            ลาชั่วโมง
-                        </button>
-                        <div class="ml-auto">
-                            <select id="calendar-filter-position" onchange="filterCalendarByPosition(this.value)" class="p-2 border rounded-lg text-sm">
-                                <option value="">ทุกตำแหน่ง</option>
-                                <option value="เภสัช">เภสัช</option>
-                                <option value="จพง">จพง</option>
-                                <option value="จนท">จนท</option>
-                            </select>
-                        </div>
+                        <div class="flex items-center gap-4 mb-4 pb-4 border-b w-full">
+    <span class="font-semibold text-gray-700 mr-2">ตัวกรอง:</span>
+    
+    <label class="inline-flex items-center cursor-pointer select-none hover:bg-green-50 px-3 py-1 rounded-lg transition-colors border border-transparent hover:border-green-200">
+        <input type="checkbox" id="filter-fullday" class="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 transition duration-150 ease-in-out cursor-pointer" 
+               checked onchange="toggleCalendarFilter('fullDay', this)">
+        <span class="ml-2 text-gray-700 font-medium">ลาในระบบ</span>
+    </label>
+
+    <label class="inline-flex items-center cursor-pointer select-none hover:bg-blue-50 px-3 py-1 rounded-lg transition-colors border border-transparent hover:border-blue-200">
+        <input type="checkbox" id="filter-hourly" class="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 transition duration-150 ease-in-out cursor-pointer" 
+               checked onchange="toggleCalendarFilter('hourly', this)">
+        <span class="ml-2 text-gray-700 font-medium">ลาชั่วโมง</span>
+    </label>
+
+    <div class="ml-auto">
+        <select id="calendar-filter-position" onchange="filterCalendarByPosition(this.value)" class="p-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 outline-none">
+            <option value="">ทุกตำแหน่ง</option>
+            <option value="เภสัช">เภสัช</option>
+            <option value="จพง">จพง</option>
+            <option value="จนท">จนท</option>
+        </select>
+    </div>
+</div>
                     </div>
                     <div id="calendar-grid-container"></div>
                     <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4"><div class="flex items-center"><div class="w-4 h-4 sick-leave rounded mr-2"></div><span class="text-sm">ลาป่วย</span></div><div class="flex items-center"><div class="w-4 h-4 vacation-leave rounded mr-2"></div><span class="text-sm">ลาพักผ่อน</span></div><div class="flex items-center"><div class="w-4 h-4 personal-leave rounded mr-2"></div><span class="text-sm">ลากิจ</span></div><div class="flex items-center"><div class="w-4 h-4 maternity-leave rounded mr-2"></div><span class="text-sm">ลาคลอด</span></div></div>
@@ -431,34 +440,6 @@
             พัฒนาโดย ภก.ธีรเดช วิชัย - โรงพยาบาลอุตรดิตถ์
         </div>
     </footer>
-
-<!-- Backup Modal -->
-<div id="backup-modal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
-  <div class="bg-white p-6 rounded-xl w-full max-w-sm">
-      <h2 class="text-xl font-bold mb-4 text-center">Backup ข้อมูล</h2>
-
-      <button onclick="downloadHourlyJSON()" 
-          class="w-full bg-blue-600 text-white py-2 rounded-lg mb-3">
-          ⏰ ลาชั่วโมง (JSON)
-      </button>
-
-      <button onclick="downloadNormalLeaveJSON()" 
-          class="w-full bg-green-600 text-white py-2 rounded-lg">
-          📄 แจ้งลาปกติ (JSON)
-      </button>
-
-      <button onclick="exportAllDataToExcel()"
-          class="w-full bg-purple-600 text-white py-2 rounded-lg mt-2">
-          📊 Backup Excel
-      </button>
-
-      <button onclick="closeBackupMenu()"
-          class="mt-4 w-full bg-gray-300 py-2 rounded-lg">
-          ปิด
-      </button>
-  </div>
-</div>
-
 </body>
 
 </html>
